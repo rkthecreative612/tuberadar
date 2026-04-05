@@ -1,4 +1,13 @@
+import { useState } from 'react'
+import supabase from '../lib/supabase'
+
 function Sidebar() {
+  const [showInput, setShowInput] = useState(false)
+  const [channelName, setChannelName] = useState('')
+  const [channels, setChannels] = useState([
+    { name: 'TechTalks IN', subscribers: '48.2K subs', avatar: 'T' },
+  ])
+
   const rootStyle = {
     width: '220px',
     minWidth: '220px',
@@ -131,6 +140,38 @@ function Sidebar() {
     fontFamily: 'system-ui, sans-serif',
   }
 
+  const addChannelFormStyle = {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '8px',
+    marginTop: '2px',
+  }
+
+  const channelInputStyle = {
+    width: '100%',
+    boxSizing: 'border-box',
+    padding: '8px 10px',
+    fontSize: '12px',
+    fontFamily: 'system-ui, sans-serif',
+    color: '#ffffff',
+    backgroundColor: '#141414',
+    border: '1px solid #444444',
+    borderRadius: '6px',
+    outline: 'none',
+  }
+
+  const saveChannelStyle = {
+    padding: '8px 10px',
+    fontSize: '12px',
+    fontWeight: 600,
+    fontFamily: 'system-ui, sans-serif',
+    color: '#ffffff',
+    backgroundColor: '#1f1f1f',
+    border: '1px solid #444444',
+    borderRadius: '6px',
+    cursor: 'pointer',
+  }
+
   const navStyle = {
     display: 'flex',
     flexDirection: 'column',
@@ -164,6 +205,38 @@ function Sidebar() {
     fontWeight: 500,
   }
 
+  const handleAddChannelClick = () => {
+    setShowInput(true)
+  }
+
+  const handleSaveChannel = async () => {
+    const trimmed = channelName.trim()
+    if (!trimmed) return
+
+    const channel_id = trimmed.toLowerCase().replace(/\s/g, '-')
+    const { error } = await supabase.from('channels').insert({
+      name: trimmed,
+      channel_id,
+    })
+
+    if (error) {
+      console.error(error)
+      return
+    }
+
+    const letter = trimmed.charAt(0).toUpperCase() || '?'
+    setChannels((prev) => [
+      ...prev,
+      {
+        name: trimmed,
+        subscribers: '—',
+        avatar: letter,
+      },
+    ])
+    setChannelName('')
+    setShowInput(false)
+  }
+
   return (
     <aside style={rootStyle} aria-label="TubeRadar sidebar">
       <div style={logoRowStyle}>
@@ -176,14 +249,16 @@ function Sidebar() {
 
       <div style={channelsBlockStyle}>
         <p style={sectionLabelStyle}>My channels</p>
-        <div style={channelCardStyle}>
-          <div style={avatarStyle}>T</div>
-          <div style={channelMetaStyle}>
-            <p style={channelNameStyle}>TechTalks IN</p>
-            <p style={channelSubsStyle}>48.2K subs</p>
+        {channels.map((ch, i) => (
+          <div key={`${ch.name}-${i}`} style={channelCardStyle}>
+            <div style={avatarStyle}>{ch.avatar}</div>
+            <div style={channelMetaStyle}>
+              <p style={channelNameStyle}>{ch.name}</p>
+              <p style={channelSubsStyle}>{ch.subscribers}</p>
+            </div>
           </div>
-        </div>
-        <button type="button" style={addChannelStyle}>
+        ))}
+        <button type="button" style={addChannelStyle} onClick={handleAddChannelClick}>
           <svg
             width="16"
             height="16"
@@ -201,6 +276,21 @@ function Sidebar() {
           </svg>
           Add Channel
         </button>
+        {showInput ? (
+          <div style={addChannelFormStyle}>
+            <input
+              type="text"
+              value={channelName}
+              onChange={(e) => setChannelName(e.target.value)}
+              placeholder="Channel name"
+              style={channelInputStyle}
+              aria-label="Channel name"
+            />
+            <button type="button" style={saveChannelStyle} onClick={handleSaveChannel}>
+              Save
+            </button>
+          </div>
+        ) : null}
       </div>
 
       <nav style={navStyle} aria-label="Main navigation">

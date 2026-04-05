@@ -1,4 +1,61 @@
+import { useState, useEffect } from 'react'
+import { searchCompetitorVideos } from '../lib/youtube'
+import supabase from '../lib/supabase'
+
 function MainDashboard() {
+  const [videos, setVideos] = useState([])
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(null)
+
+  async function fetchVideos() {
+    setLoading(true)
+    setError(null)
+    try {
+      const items = await searchCompetitorVideos('tech review india 2026')
+      const mapped = items.map((item) => ({
+        title: item.snippet.title,
+        channelName: item.snippet.channelTitle,
+        videoId: item.id.videoId,
+        thumbnail: item.snippet.thumbnails.default.url,
+        publishedAt: item.snippet.publishedAt,
+        views: 0,
+        performanceTag: 'Trending',
+      }))
+
+      if (mapped.length > 0) {
+        const rows = mapped.map((v) => ({
+          title: v.title,
+          channel_name: v.channelName,
+          video_id: v.videoId,
+          thumbnail: v.thumbnail,
+          published_at: v.publishedAt,
+          views: v.views,
+          performance_tag: v.performanceTag,
+        }))
+        const { error: insertError } = await supabase
+          .from('competitor_videos')
+          .insert(rows)
+        if (insertError) {
+          console.error(insertError)
+          setError(insertError.message)
+        }
+      }
+
+      setVideos(mapped)
+    } catch (e) {
+      console.error(e)
+      setError(e?.message ?? 'Failed to load videos')
+      setVideos([])
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    void fetchVideos()
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- run fetch once on mount
+  }, [])
+
   const rootStyle = {
     flex: 1,
     minWidth: 0,
@@ -145,12 +202,6 @@ function MainDashboard() {
     boxSizing: 'border-box',
   }
 
-  const videoEmojiStyle = {
-    fontSize: '22px',
-    lineHeight: 1,
-    flexShrink: 0,
-  }
-
   const videoBodyStyle = {
     flex: 1,
     minWidth: 0,
@@ -186,22 +237,24 @@ function MainDashboard() {
     whiteSpace: 'nowrap',
   }
 
-  const tagViralStyle = {
-    ...tagBaseStyle,
-    color: '#ff5252',
-    backgroundColor: 'rgba(255, 82, 82, 0.12)',
-  }
-
   const tagTrendingStyle = {
     ...tagBaseStyle,
     color: '#4caf50',
     backgroundColor: 'rgba(76, 175, 80, 0.12)',
   }
 
-  const tagSteadyStyle = {
-    ...tagBaseStyle,
-    color: '#42a5f5',
-    backgroundColor: 'rgba(66, 165, 245, 0.12)',
+  const loadingVideosStyle = {
+    margin: 0,
+    fontSize: '14px',
+    color: '#ffffff',
+    fontFamily: 'system-ui, sans-serif',
+  }
+
+  const errorVideosStyle = {
+    margin: 0,
+    fontSize: '13px',
+    color: '#ff5252',
+    fontFamily: 'system-ui, sans-serif',
   }
 
   return (
@@ -213,7 +266,7 @@ function MainDashboard() {
             Last 48 hrs · Auto-refreshes daily at 8:00 AM
           </p>
         </div>
-        <button type="button" style={refreshButtonStyle}>
+        <button type="button" style={refreshButtonStyle} onClick={() => void fetchVideos()}>
           ↻ Refresh Now
         </button>
       </header>
@@ -244,38 +297,23 @@ function MainDashboard() {
 
         <h2 style={sectionHeaderStyle}>Top performing — last 48 hrs</h2>
 
-        <div style={videoListStyle}>
-          <div style={videoRowStyle}>
-            <span style={videoEmojiStyle} aria-hidden>
-              📱
-            </span>
-            <div style={videoBodyStyle}>
-              <p style={videoTitleStyle}>Best AI Phones Under $500 in 2026</p>
-              <p style={videoMetaStyle}>PhonePulse · 1.2M views</p>
-            </div>
-            <span style={tagViralStyle}>🔥 Viral</span>
+        {error ? <p style={errorVideosStyle}>{error}</p> : null}
+
+        {loading ? (
+          <p style={loadingVideosStyle}>Loading competitor videos...</p>
+        ) : (
+          <div style={videoListStyle}>
+            {videos.map((v) => (
+              <div key={v.videoId} style={videoRowStyle}>
+                <div style={videoBodyStyle}>
+                  <p style={videoTitleStyle}>{v.title}</p>
+                  <p style={videoMetaStyle}>{v.channelName}</p>
+                </div>
+                <span style={tagTrendingStyle}>{v.performanceTag}</span>
+              </div>
+            ))}
           </div>
-          <div style={videoRowStyle}>
-            <span style={videoEmojiStyle} aria-hidden>
-              🤖
-            </span>
-            <div style={videoBodyStyle}>
-              <p style={videoTitleStyle}>AI Agents Explained for Creators</p>
-              <p style={videoMetaStyle}>TechBrief · 640K views</p>
-            </div>
-            <span style={tagTrendingStyle}>↑ Trending</span>
-          </div>
-          <div style={videoRowStyle}>
-            <span style={videoEmojiStyle} aria-hidden>
-              💻
-            </span>
-            <div style={videoBodyStyle}>
-              <p style={videoTitleStyle}>Laptop Buying Guide: What Actually Matters</p>
-              <p style={videoMetaStyle}>GearWatch · 210K views</p>
-            </div>
-            <span style={tagSteadyStyle}>Steady</span>
-          </div>
-        </div>
+        )}
       </div>
     </main>
   )
