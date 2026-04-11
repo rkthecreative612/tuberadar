@@ -1,12 +1,14 @@
 import { useState } from 'react'
-import Sidebar from './components/Sidebar'
 import MainDashboard from './components/MainDashboard'
+import Home from './pages/Home'
 
 function App() {
   const [activeTopic, setActiveTopic] = useState('tech review india 2026')
   const [activeChannel, setActiveChannel] = useState('TechTalks IN')
   const [activeContentType, setActiveContentType] = useState('videos')
   const [isChannelUrl, setIsChannelUrl] = useState(false)
+  const [currentPage, setCurrentPage] = useState('home')
+  const [selectedChannel, setSelectedChannel] = useState(null)
 
   const appStyle = {
     display: 'flex',
@@ -19,22 +21,28 @@ function App() {
   }
 
   return (
-    <div style={appStyle}>
-      <Sidebar
-        onChannelSelect={(channelName, channelId, contentType) => {
-          setActiveTopic(channelId)
-          setActiveChannel(channelName)
-          setActiveContentType(contentType ?? 'videos')
-          setIsChannelUrl(String(channelId ?? '').trim().startsWith('@'))
-        }}
-      />
-      <MainDashboard
-        searchTopic={activeTopic}
-        channelName={activeChannel}
-        contentType={activeContentType}
-        isChannelUrl={isChannelUrl}
-      />
-    </div>
+    <>
+      {currentPage === 'home' ? (
+        <Home onChannelClick={(channel) => {
+          console.log('Clicked channel:', channel);
+          setSelectedChannel(channel)
+          setActiveChannel(channel.name)
+          setActiveTopic(channel.name)
+          setCurrentPage('dashboard')
+        }} />
+      ) : (
+        <div style={appStyle}>
+          <MainDashboard
+            searchTopic={activeTopic}
+            channelName={activeChannel}
+            contentType={activeContentType}
+            isChannelUrl={isChannelUrl}
+            selectedChannel={selectedChannel}
+            onBackClick={() => setCurrentPage('home')}
+          />
+        </div>
+      )}
+    </>
   )
 }
 

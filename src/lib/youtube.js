@@ -25,8 +25,8 @@ function isShortByTitle(item) {
   return lower.includes('#shorts') || lower.includes('#short')
 }
 
-async function fetchSearchWithStats(searchQuery) {
-  const publishedAfter = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString()
+async function fetchSearchWithStats(searchQuery, daysAgo = 2) {
+  const publishedAfter = new Date(Date.now() - daysAgo * 24 * 60 * 60 * 1000).toISOString()
   const apiKey = import.meta.env.VITE_YOUTUBE_API_KEY
 
   const { data } = await axios.get('https://www.googleapis.com/youtube/v3/search', {
@@ -85,22 +85,22 @@ async function fetchSearchWithStats(searchQuery) {
   })
 }
 
-export async function searchByKeywords(topic, _contentType = 'videos') {
+export async function searchByKeywords(topic, _contentType = 'videos', daysAgo = 2) {
   try {
     const q = String(topic ?? '').trim()
     if (!q) return []
-    return await fetchSearchWithStats(q)
+    return await fetchSearchWithStats(q, daysAgo)
   } catch (e) {
     console.log(e)
     return []
   }
 }
 
-export async function searchByChannel(channelUrlOrHandle, _contentType = 'videos') {
+export async function searchByChannel(channelUrlOrHandle, _contentType = 'videos', daysAgo = 2) {
   try {
     const handle = extractHandleForChannelSearch(channelUrlOrHandle)
     if (!handle) return []
-    return await fetchSearchWithStats(handle)
+    return await fetchSearchWithStats(handle, daysAgo)
   } catch (e) {
     console.log(e)
     return []
