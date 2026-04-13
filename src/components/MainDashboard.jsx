@@ -2,77 +2,110 @@ import { useState, useEffect } from 'react'
 import { searchByChannel, searchByKeywords } from '../lib/youtube'
 import supabase from '../lib/supabase'
 
-function MainDashboard({
-  searchTopic = 'madan gowri',
-  channelName = 'TechTalks IN',
-  contentType = 'videos',
-  isChannelUrl = false,
-  selectedChannel = null,
-  onBackClick = null,
-}) {
+function MainDashboard({ selectedMyChannel, onBackClick }) {
   const [videos, setVideos] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
+  const [stats, setStats] = useState({
+    recentCount: 0,
+    topCount: 0,
+    bestChannel: '—'
+  })
 
-  async function fetchVideos() {
-    console.log('Fetching videos for topic:', searchTopic);
-    setLoading(true)
-    setError(null)
-    try {
-      const topicToSearch = searchTopic;
-      console.log('Using topicToSearch:', topicToSearch);
+  useEffect(() => {
+    if (!selectedMyChannel) return
+    let isMounted = true
 
-      const items = isChannelUrl
-        ? await searchByChannel(topicToSearch, contentType)
-        : await searchByKeywords(topicToSearch, contentType)
-        
-      const mapped = items.map((item) => ({
-        title: item.snippet.title,
-        channelName: item.snippet.channelTitle,
-        videoId: item.id.videoId,
-        thumbnail: `https://img.youtube.com/vi/${item.id.videoId}/mqdefault.jpg`,
-        publishedAt: item.snippet.publishedAt,
-        viewCount: item.viewCount ?? 0,
-        likeCount: item.likeCount ?? 0,
-        views: item.viewCount ?? 0,
-      }))
+    async function fetchVideos() {
+      setLoading(true)
+      setError(null)
+      try {
+        const { data: competitors, error: compError } = await supabase
+          .from('competitor_channels')
+          .select('*')
+          .eq('my_channel_id', selectedMyChannel.id)
 
-      if (mapped.length > 0) {
-        const rows = mapped.map((v) => ({
-          title: v.title,
-          channel_name: v.channelName,
-          video_id: v.videoId,
-          thumbnail: v.thumbnail,
-          published_at: v.publishedAt,
-          views: v.views,
-        }))
-        const { error: insertError } = await supabase
-          .from('competitor_videos')
-          .insert(rows)
-        if (insertError) {
-          console.error(insertError)
+        if (compError) throw new Error('Failed to load competitors')
+
+        if (!competitors || competitors.length === 0) {
+          if (isMounted) setVideos([])
+          return
         }
+
+        const promises = competitors.map(async (comp) => {
+          let items = []
+          if (comp.channel_url) {
+             items = await searchByChannel(comp.channel_url)
+          } else if (comp.keywords) {
+             items = await searchByKeywords(comp.keywords)
+          }
+
+          if (!items) return []
+
+          return items.map(item => {
+            const viewCount = item.viewCount ?? 0;
+            return {
+              compName: comp.name,
+              title: item.snippet.title,
+              channelName: item.snippet.channelTitle,
+              videoId: item.id.videoId,
+              thumbnail: `https://img.youtube.com/vi/${item.id.videoId}/mqdefault.jpg`,
+              publishedAt: item.snippet.publishedAt,
+              viewCount: viewCount,
+              likeCount: item.likeCount ?? 0,
+            }
+          })
+        })
+
+        const resultsArray = await Promise.all(promises)
+        let allVideos = resultsArray.flat()
+
+        // Sort by views descending
+        allVideos.sort((a, b) => b.viewCount - a.viewCount)
+
+        if (!isMounted) return
+
+        setVideos(allVideos)
+
+        // Calculate stats
+        const topCount = allVideos.filter(v => v.viewCount > 100000).length;
+        let bestChannelName = '—';
+        if (allVideos.length > 0) {
+          bestChannelName = allVideos[0].compName || allVideos[0].channelName;
+        }
+
+        setStats({
+          recentCount: allVideos.length,
+          topCount: topCount,
+          bestChannel: bestChannelName
+        });
+
+      } catch (e) {
+        console.error(e)
+        if (isMounted) {
+          setError(e?.message ?? 'Failed to load videos')
+          setVideos([])
+        }
+      } finally {
+        if (isMounted) setLoading(false)
       }
-
-      setVideos(mapped)
-    } catch (e) {
-      console.error(e)
-      setError(e?.message ?? 'Failed to load videos')
-      setVideos([])
-    } finally {
-      setLoading(false)
     }
+
+    fetchVideos()
+
+    return () => {
+      isMounted = false
+    }
+  }, [selectedMyChannel])
+
+  const handleDelete = async () => {
+    if (!selectedMyChannel) return
+    const confirmDelete = window.confirm(`Delete ${selectedMyChannel.name}?`)
+    if (!confirmDelete) return
+
+    await supabase.from('my_channels').delete().eq('id', selectedMyChannel.id)
+    if (onBackClick) onBackClick()
   }
-
-  useEffect(() => {
-    if (searchTopic) {
-      fetchVideos();
-    }
-  }, [searchTopic]);
-
-  useEffect(() => {
-    fetchVideos();
-  }, []);
 
   const timeAgo = (dateString) => {
     const d = new Date(dateString)
@@ -133,17 +166,18 @@ function MainDashboard({
 
   const topTitleStyle = {
     margin: 0,
-    fontSize: '18px',
+    fontSize: '20px',
     fontWeight: 'bold',
     color: '#fff',
     flex: 1,
-    textAlign: 'center',
   }
 
   const topBarLeftStyle = {
     flex: 1,
     display: 'flex',
     justifyContent: 'flex-start',
+    alignItems: 'center',
+    gap: '16px'
   }
 
   const topBarRightStyle = {
@@ -174,9 +208,9 @@ function MainDashboard({
   const backButtonStyle = {
     padding: '8px 12px',
     fontSize: '14px',
-    color: '#ccc',
-    backgroundColor: 'transparent',
-    border: '1px solid #444',
+    color: '#fff',
+    backgroundColor: '#333',
+    border: 'none',
     borderRadius: '6px',
     cursor: 'pointer',
     fontWeight: 600
@@ -188,20 +222,52 @@ function MainDashboard({
     padding: '24px',
     display: 'flex',
     flexDirection: 'column',
-    gap: '20px',
+    gap: '30px',
+  }
+
+  const statCardsContainerStyle = {
+    display: 'flex',
+    gap: '20px'
+  }
+
+  const statCardStyle = {
+    flex: 1,
+    backgroundColor: '#1a1a1a',
+    border: '1px solid #333',
+    borderRadius: '12px',
+    padding: '20px',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '8px'
+  }
+
+  const statValStyle = {
+    fontSize: '24px',
+    fontWeight: 'bold',
+    color: '#fff',
+    margin: 0
+  }
+
+  const statLabelStyle = {
+    fontSize: '14px',
+    color: '#888',
+    margin: 0,
+    textTransform: 'uppercase',
+    letterSpacing: '0.5px',
+    fontWeight: 600
   }
 
   const sectionHeaderStyle = {
     margin: 0,
-    fontSize: '18px',
+    fontSize: '20px',
     fontWeight: 'bold',
     color: '#fff',
-    marginBottom: '8px'
+    marginBottom: '16px'
   }
 
   const gridStyle = {
     display: 'grid',
-    gridTemplateColumns: 'repeat(3, 1fr)',
+    gridTemplateColumns: 'repeat(4, 1fr)',
     gap: '20px',
   }
 
@@ -209,7 +275,7 @@ function MainDashboard({
     backgroundColor: '#1a1a1a',
     borderRadius: '12px',
     border: '1px solid #333',
-    padding: '16px',
+    padding: '12px',
     display: 'flex',
     flexDirection: 'column',
     gap: '12px',
@@ -220,7 +286,7 @@ function MainDashboard({
   const thumbnailContainerStyle = {
     position: 'relative',
     width: '100%',
-    height: '160px',
+    height: '140px',
   }
 
   const thumbnailStyle = {
@@ -237,7 +303,7 @@ function MainDashboard({
     backgroundColor: 'rgba(0, 0, 0, 0.7)',
     color: '#fff',
     fontSize: '11px',
-    padding: '2px 8px',
+    padding: '4px 8px',
     borderRadius: '10px',
   }
 
@@ -251,6 +317,12 @@ function MainDashboard({
     WebkitLineClamp: 2,
     WebkitBoxOrient: 'vertical',
     overflow: 'hidden',
+  }
+
+  const compLabelStyle = {
+    fontSize: '11px',
+    color: '#bbb',
+    margin: 0
   }
 
   const brainstormButtonStyle = {
@@ -271,6 +343,13 @@ function MainDashboard({
     backgroundColor: '#1a1a1a',
   }
 
+  const formatCompact = (num) => {
+    return Intl.NumberFormat('en-US', {
+      notation: 'compact',
+      maximumFractionDigits: 1
+    }).format(num);
+  };
+
   return (
     <main style={rootStyle}>
       <header style={topBarStyle}>
@@ -280,73 +359,91 @@ function MainDashboard({
               &larr; Back
             </button>
           )}
+          <h1 style={topTitleStyle}>{selectedMyChannel?.name || 'Dashboard'}</h1>
         </div>
-        <h1 style={topTitleStyle}>{channelName}</h1>
+        
         <div style={topBarRightStyle}>
           <button type="button" style={actionButtonStyle}>Edit</button>
-          <button type="button" style={dangerButtonStyle}>Delete</button>
+          <button type="button" style={dangerButtonStyle} onClick={handleDelete}>Delete</button>
         </div>
       </header>
 
       <div style={scrollAreaStyle}>
-        <h2 style={sectionHeaderStyle}>Recent uploads</h2>
+        
+        <div style={statCardsContainerStyle}>
+          <div style={statCardStyle}>
+            <p style={statValStyle}>{stats.recentCount}</p>
+            <p style={statLabelStyle}>Recent Uploads (48h)</p>
+          </div>
+          <div style={statCardStyle}>
+            <p style={statValStyle}>{stats.topCount}</p>
+            <p style={statLabelStyle}>Top Performing (&gt;100k views)</p>
+          </div>
+          <div style={statCardStyle}>
+            <p style={statValStyle} style={{ ...statValStyle, fontSize: '20px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{stats.bestChannel}</p>
+            <p style={statLabelStyle}>Best Category Channel</p>
+          </div>
+        </div>
 
-        {error && <p style={{ color: '#ff5252' }}>{error}</p>}
+        <div>
+          <h2 style={sectionHeaderStyle}>Competitor Videos</h2>
 
-        <div style={gridStyle}>
-          {loading || videos.length === 0 ? (
-            Array.from({ length: 6 }).map((_, i) => (
-              <div key={`skeleton-${i}`} style={skeletonCardStyle}>
-                <div style={thumbnailContainerStyle}>
-                  <div style={{ ...thumbnailStyle, backgroundColor: '#2a2a2a' }}></div>
-                  <span style={{ ...timePillStyle, backgroundColor: '#2a2a2a', color: '#888' }}>&mdash; hrs ago</span>
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <div style={{ width: '80%', height: '12px', backgroundColor: '#2a2a2a', borderRadius: '4px' }}></div>
-                  <div style={{ width: '60%', height: '12px', backgroundColor: '#2a2a2a', borderRadius: '4px' }}></div>
-                </div>
-                <div style={{ marginTop: 'auto', marginBottom: '8px' }}>
-                  <span style={{ padding: '4px 8px', borderRadius: '6px', fontSize: '12px', fontWeight: 'bold', color: '#888', backgroundColor: '#2a2a2a', display: 'inline-block' }}>Score: &mdash;%</span>
-                </div>
-                <button style={{ ...brainstormButtonStyle, backgroundColor: '#2a2a2a', color: '#888', borderColor: 'transparent', cursor: 'default' }}>Move to Brainstorm</button>
-              </div>
-            ))
-          ) : (
-            videos.map((v) => {
-              const score = calcScore(v);
-              const scoreColor = getScoreColor(score);
-              return (
-                <div key={v.videoId} style={cardStyle}>
+          {error && <p style={{ color: '#ff5252' }}>{error}</p>}
+
+          <div style={gridStyle}>
+            {loading ? (
+              Array.from({ length: 8 }).map((_, i) => (
+                <div key={`skeleton-${i}`} style={skeletonCardStyle}>
                   <div style={thumbnailContainerStyle}>
-                    <img src={v.thumbnail} alt={v.title} style={thumbnailStyle} />
-                    <span style={timePillStyle}>{timeAgo(v.publishedAt)}</span>
+                    <div style={{ ...thumbnailStyle, backgroundColor: '#2a2a2a' }}></div>
                   </div>
-                  <p style={videoTitleStyle}>{v.title}</p>
-                  
-                  <div style={{ marginTop: 'auto', marginBottom: '8px' }}>
-                    <span style={{
-                      padding: '4px 8px',
-                      borderRadius: '6px',
-                      fontSize: '12px',
-                      fontWeight: 'bold',
-                      color: scoreColor,
-                      backgroundColor: `${scoreColor}20`,
-                      display: 'inline-block'
-                    }}>
-                      Score: {score}%
-                    </span>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <div style={{ width: '80%', height: '12px', backgroundColor: '#2a2a2a', borderRadius: '4px' }}></div>
+                    <div style={{ width: '60%', height: '12px', backgroundColor: '#2a2a2a', borderRadius: '4px' }}></div>
                   </div>
-
-                  <button 
-                    style={brainstormButtonStyle}
-                    onClick={() => console.log('Move to Brainstorm clicked:', v.title)}
-                  >
-                    Move to Brainstorm
-                  </button>
+                  <button style={{ ...brainstormButtonStyle, backgroundColor: '#2a2a2a', color: '#888', borderColor: 'transparent', cursor: 'default' }}>Loading...</button>
                 </div>
-              );
-            })
-          )}
+              ))
+            ) : videos.length === 0 ? (
+              <p style={{ color: '#888' }}>No videos found.</p>
+            ) : (
+              videos.map((v, idx) => {
+                const score = calcScore(v);
+                const scoreColor = getScoreColor(score);
+                return (
+                  <div key={`${v.videoId}-${idx}`} style={cardStyle}>
+                    <div style={thumbnailContainerStyle}>
+                      <img src={v.thumbnail} alt={v.title} style={thumbnailStyle} />
+                      <span style={timePillStyle}>{timeAgo(v.publishedAt)}</span>
+                    </div>
+                    <p style={compLabelStyle}>{v.compName || v.channelName} • {formatCompact(v.viewCount)} views</p>
+                    <p style={videoTitleStyle}>{v.title}</p>
+                    
+                    <div style={{ marginTop: 'auto', marginBottom: '8px' }}>
+                      <span style={{
+                        padding: '4px 8px',
+                        borderRadius: '6px',
+                        fontSize: '12px',
+                        fontWeight: 'bold',
+                        color: scoreColor,
+                        backgroundColor: `${scoreColor}20`,
+                        display: 'inline-block'
+                      }}>
+                        Score: {score}%
+                      </span>
+                    </div>
+
+                    <button 
+                      style={brainstormButtonStyle}
+                      onClick={() => console.log('Move to Brainstorm clicked:', v.title)}
+                    >
+                      Move to Brainstorm
+                    </button>
+                  </div>
+                );
+              })
+            )}
+          </div>
         </div>
       </div>
     </main>

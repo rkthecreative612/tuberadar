@@ -3,15 +3,15 @@ import supabase from '../lib/supabase';
 
 const cardStyle = {
   width: '100%',
-  height: '220px',
+  height: '240px',
   backgroundColor: '#1a1a1a',
   border: '1px solid #333',
   borderRadius: '12px',
   padding: '20px',
   boxSizing: 'border-box',
-  cursor: 'pointer',
   display: 'flex',
   flexDirection: 'column',
+  position: 'relative'
 };
 
 const avatarStyle = {
@@ -42,23 +42,41 @@ const statStyle = {
   lineHeight: 1.4
 };
 
-const helperTextStyle = {
-  color: '#888',
-  fontSize: '12px',
-  margin: 0,
-  marginTop: 'auto',
-  paddingTop: '12px'
-};
-
 const getAvatarColor = (name) => {
   const colors = ['#e53935', '#43a047', '#1e88e5', '#8e24aa', '#f4511e', '#3949ab', '#00acc1'];
   return colors[(name || '').length % colors.length];
 };
 
+const buttonRowStyle = {
+  display: 'flex',
+  gap: '10px',
+  marginTop: 'auto',
+  paddingTop: '12px'
+};
+
+const actionButtonStyle = {
+  flex: 1,
+  padding: '8px',
+  border: '1px solid #444',
+  borderRadius: '6px',
+  backgroundColor: '#2a2a2a',
+  color: '#fff',
+  fontSize: '13px',
+  fontWeight: 'bold',
+  cursor: 'pointer',
+  textAlign: 'center'
+};
+
+const viewButtonStyle = {
+  ...actionButtonStyle,
+  backgroundColor: '#fff',
+  color: '#000',
+};
+
 const ChannelCard = ({ ch, onClick }) => {
   const accentColor = getAvatarColor(ch.name);
   return (
-    <div style={{ ...cardStyle, borderLeft: `4px solid ${accentColor}` }} onClick={() => onClick(ch)}>
+    <div style={{ ...cardStyle, borderTop: `4px solid ${accentColor}` }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
         <div style={{ ...avatarStyle, backgroundColor: accentColor }}>
           {(ch.name || '?').charAt(0).toUpperCase()}
@@ -67,41 +85,27 @@ const ChannelCard = ({ ch, onClick }) => {
       </div>
 
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-        <p style={statStyle}>&#128197; Recent uploads: &mdash; videos (7 days)</p>
-        <p style={statStyle}>&#128336; Last video: &mdash; hrs ago</p>
-        <p style={statStyle}>&#11088; Channel score: &mdash;%</p>
+        <p style={statStyle}>&#128197; Recent uploads: &mdash;</p>
+        <p style={statStyle}>&#128336; Top performing: &mdash;</p>
+        <p style={statStyle}>&#11088; Score: &mdash;</p>
       </div>
 
-      <p style={helperTextStyle}>Click to view &rarr;</p>
+      <div style={buttonRowStyle}>
+        <button style={viewButtonStyle} onClick={() => onClick(ch)}>View</button>
+        <button style={actionButtonStyle}>Edit</button>
+      </div>
     </div>
   );
 };
 
 
-const Home = ({ onChannelClick }) => {
+const Home = ({ onChannelClick, onAddClick }) => {
   const [channels, setChannels] = useState([]);
-  const [showAddForm, setShowAddForm] = useState(false);
-  const [addMode, setAddMode] = useState('url');
-  const [channelUrl, setChannelUrl] = useState('');
-  const [urlError, setUrlError] = useState('');
-  const [isValidUrl, setIsValidUrl] = useState(false);
-  const [extractedHandle, setExtractedHandle] = useState('');
-  const [channelName, setChannelName] = useState('');
-  const [keywords, setKeywords] = useState('');
 
   const fetchChannels = async () => {
-    const { data, error } = await supabase.from('channels').select('*');
+    const { data, error } = await supabase.from('my_channels').select('*').order('created_at', { ascending: false });
     if (!error && data) {
-      const unique = [];
-      const names = new Set();
-      for (const ch of data) {
-        const normalized = (ch.name || '').toLowerCase().trim();
-        if (!names.has(normalized)) {
-          names.add(normalized);
-          unique.push(ch);
-        }
-      }
-      setChannels(unique);
+      setChannels(data);
     } else {
       console.error(error);
     }
@@ -110,70 +114,6 @@ const Home = ({ onChannelClick }) => {
   useEffect(() => {
     fetchChannels();
   }, []);
-
-  const handleUrlChange = (e) => {
-    const val = e.target.value;
-    setChannelUrl(val);
-    setUrlError('');
-    setIsValidUrl(false);
-    setExtractedHandle('');
-
-    const trimmed = val.trim();
-    if (!trimmed) return;
-
-    let handle = '';
-    const handleMatch = trimmed.match(/^https:\/\/(www\.)?youtube\.com\/@([a-zA-Z0-9_\-.]+)\/?$/);
-    const channelIdMatch = trimmed.match(/^https:\/\/(www\.)?youtube\.com\/channel\/(UC[a-zA-Z0-9_\-]+)\/?$/);
-
-    if (handleMatch) {
-      handle = handleMatch[2];
-    } else if (channelIdMatch) {
-      handle = channelIdMatch[2];
-    }
-
-    if (handle) {
-      setIsValidUrl(true);
-      setExtractedHandle(handle);
-    } else {
-      setUrlError('Please enter a valid YouTube channel URL');
-    }
-  };
-
-  const handleSave = async () => {
-    let finalName = '';
-    let finalId = '';
-
-    if (addMode === 'url') {
-      if (!isValidUrl || !extractedHandle) {
-        setUrlError('Please enter a valid YouTube channel URL');
-        return;
-      }
-      finalName = extractedHandle;
-      finalId = extractedHandle;
-    } else {
-      if (!channelName.trim() || !keywords.trim()) return;
-      finalName = channelName.trim();
-      finalId = keywords.trim();
-    }
-
-    const { error } = await supabase.from('channels').insert({
-      name: finalName,
-      channel_id: finalId,
-    });
-
-    if (!error) {
-      setChannelName('');
-      setKeywords('');
-      setChannelUrl('');
-      setExtractedHandle('');
-      setIsValidUrl(false);
-      setUrlError('');
-      setShowAddForm(false);
-      fetchChannels();
-    } else {
-      console.error(error);
-    }
-  };
 
   const containerStyle = {
     display: 'flex',
@@ -185,6 +125,7 @@ const Home = ({ onChannelClick }) => {
     color: 'white',
     padding: '40px',
     boxSizing: 'border-box',
+    overflowY: 'auto'
   };
 
   const topBarStyle = {
@@ -235,7 +176,8 @@ const Home = ({ onChannelClick }) => {
     gridTemplateColumns: 'repeat(3, 1fr)',
     gap: '20px',
     flex: 1,
-    alignItems: 'stretch'
+    alignItems: 'start',
+    alignContent: 'start'
   };
 
   const addCardStyle = {
@@ -247,64 +189,10 @@ const Home = ({ onChannelClick }) => {
     cursor: 'pointer'
   };
 
-  const formContainerStyle = {
-    ...cardStyle,
-    cursor: 'default',
-    gap: '10px'
-  };
-
-  const modeToggleRowStyle = {
-    display: 'flex',
-    gap: '8px',
-    marginBottom: '4px',
-  }
-
-  const modeToggleBaseStyle = {
-    flex: 1,
-    padding: '8px',
-    fontSize: '12px',
-    fontWeight: 'bold',
-    backgroundColor: '#0a0a0a',
-    border: '1px solid #333',
-    color: '#888',
-    borderRadius: '6px',
-    cursor: 'pointer'
-  }
-
-  const modeToggleActiveStyle = {
-    ...modeToggleBaseStyle,
-    backgroundColor: '#fff',
-    color: '#000',
-    borderColor: '#fff'
-  }
-
-  const inputStyle = {
-    width: '100%',
-    padding: '10px',
-    backgroundColor: '#0a0a0a',
-    border: '1px solid #333',
-    borderRadius: '6px',
-    color: 'white',
-    fontSize: '14px',
-    boxSizing: 'border-box',
-    outline: 'none'
-  };
-
-  const saveButtonStyle = {
-    padding: '10px',
-    backgroundColor: '#fff',
-    color: '#000',
-    border: 'none',
-    borderRadius: '6px',
-    cursor: 'pointer',
-    fontWeight: 'bold',
-    fontSize: '14px',
-    marginTop: '4px'
-  };
-
   const addIconStyle = {
-    fontSize: '32px',
-    color: '#888',
+    fontSize: '48px',
+    color: '#555',
+    margin: 0
   };
 
   return (
@@ -322,55 +210,13 @@ const Home = ({ onChannelClick }) => {
         </div>
         <div style={centerAreaStyle}>
           {channels.map((ch) => (
-            <ChannelCard key={ch.id || ch.name} ch={ch} onClick={onChannelClick} />
+            <ChannelCard key={ch.id} ch={ch} onClick={onChannelClick} />
           ))}
 
-          {showAddForm ? (
-            <div style={formContainerStyle}>
-              <div style={modeToggleRowStyle}>
-                <button type="button" style={addMode === 'url' ? modeToggleActiveStyle : modeToggleBaseStyle} onClick={() => setAddMode('url')}>By URL</button>
-                <button type="button" style={addMode === 'keywords' ? modeToggleActiveStyle : modeToggleBaseStyle} onClick={() => setAddMode('keywords')}>By Keywords</button>
-              </div>
-
-              {addMode === 'url' ? (
-                <>
-                  <div style={{ position: 'relative' }}>
-                    <input
-                      style={{...inputStyle, paddingRight: isValidUrl ? '32px' : '10px'}}
-                      placeholder="https://youtube.com/@handle"
-                      value={channelUrl}
-                      onChange={handleUrlChange}
-                    />
-                    {isValidUrl && (
-                      <span style={{ position: 'absolute', right: '10px', top: '10px', color: '#4caf50', fontWeight: 'bold' }}>&#10004;</span>
-                    )}
-                  </div>
-                  {urlError && <p style={{ color: '#ff5252', fontSize: '11px', margin: 0 }}>{urlError}</p>}
-                </>
-              ) : (
-                <>
-                  <input
-                    style={inputStyle}
-                    placeholder="Channel Name"
-                    value={channelName}
-                    onChange={(e) => setChannelName(e.target.value)}
-                  />
-                  <input
-                    style={inputStyle}
-                    placeholder="Keywords (e.g. tech)"
-                    value={keywords}
-                    onChange={(e) => setKeywords(e.target.value)}
-                  />
-                </>
-              )}
-              
-              <button style={saveButtonStyle} onClick={handleSave}>Save</button>
-            </div>
-          ) : (
-            <div style={addCardStyle} onClick={() => setShowAddForm(true)}>
-              <span style={addIconStyle}>+</span>
-            </div>
-          )}
+          <div style={addCardStyle} onClick={onAddClick}>
+            <span style={addIconStyle}>+</span>
+            <span style={{ color: '#888', marginTop: '10px', fontSize: '14px', fontWeight: 'bold' }}>Add Channel</span>
+          </div>
         </div>
       </div>
     </div>

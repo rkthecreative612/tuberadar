@@ -1,14 +1,11 @@
 import { useState } from 'react'
 import MainDashboard from './components/MainDashboard'
 import Home from './pages/Home'
+import AddChannel from './pages/AddChannel'
 
 function App() {
-  const [activeTopic, setActiveTopic] = useState('tech review india 2026')
-  const [activeChannel, setActiveChannel] = useState('TechTalks IN')
-  const [activeContentType, setActiveContentType] = useState('videos')
-  const [isChannelUrl, setIsChannelUrl] = useState(false)
   const [currentPage, setCurrentPage] = useState('home')
-  const [selectedChannel, setSelectedChannel] = useState(null)
+  const [selectedMyChannel, setSelectedMyChannel] = useState(null)
 
   const appStyle = {
     display: 'flex',
@@ -22,22 +19,29 @@ function App() {
 
   return (
     <>
-      {currentPage === 'home' ? (
-        <Home onChannelClick={(channel) => {
-          console.log('Clicked channel:', channel);
-          setSelectedChannel(channel)
-          setActiveChannel(channel.name)
-          setActiveTopic(channel.name)
-          setCurrentPage('dashboard')
-        }} />
-      ) : (
+      {currentPage === 'home' && (
+        <Home 
+          onChannelClick={(channel) => {
+            setSelectedMyChannel(channel)
+            setCurrentPage('dashboard')
+          }} 
+          onAddClick={() => {
+            setCurrentPage('add-channel')
+          }}
+        />
+      )}
+      {currentPage === 'add-channel' && (
+        <div style={appStyle}>
+          <AddChannel 
+            onBack={() => setCurrentPage('home')}
+            onSave={() => setCurrentPage('home')}
+          />
+        </div>
+      )}
+      {currentPage === 'dashboard' && (
         <div style={appStyle}>
           <MainDashboard
-            searchTopic={activeTopic}
-            channelName={activeChannel}
-            contentType={activeContentType}
-            isChannelUrl={isChannelUrl}
-            selectedChannel={selectedChannel}
+            selectedMyChannel={selectedMyChannel}
             onBackClick={() => setCurrentPage('home')}
           />
         </div>
