@@ -25,21 +25,26 @@ function isShortByTitle(item) {
   return lower.includes('#shorts') || lower.includes('#short')
 }
 
-async function fetchSearchWithStats(searchQuery, daysAgo = 2) {
+async function fetchSearchWithStats(searchQuery, daysAgo = 2, channelId = null, maxResults = 12) {
   const publishedAfter = new Date(Date.now() - daysAgo * 24 * 60 * 60 * 1000).toISOString()
   const apiKey = import.meta.env.VITE_YOUTUBE_API_KEY
 
-  const { data } = await axios.get('https://www.googleapis.com/youtube/v3/search', {
-    params: {
-      part: 'snippet',
-      q: searchQuery,
-      type: 'video',
-      order: 'viewCount',
-      publishedAfter,
-      maxResults: 10,
-      key: apiKey,
-    },
-  })
+  const params = {
+    part: 'snippet',
+    q: searchQuery,
+    type: 'video',
+    videoDuration: 'medium',
+    order: 'viewCount',
+    publishedAfter,
+    maxResults,
+    key: apiKey,
+  }
+
+  if (channelId) {
+    params.channelId = channelId
+  }
+
+  const { data } = await axios.get('https://www.googleapis.com/youtube/v3/search', { params })
 
   const rawItems = data.items ?? []
   const searchItems = rawItems.filter((item) => !isShortByTitle(item))
@@ -56,24 +61,27 @@ async function fetchSearchWithStats(searchQuery, daysAgo = 2) {
 
   const { data: statsData } = await axios.get('https://www.googleapis.com/youtube/v3/videos', {
     params: {
-      part: 'statistics',
+      part: 'statistics,contentDetails',
       id: videoIds.join(','),
       key: apiKey,
     },
   })
 
   const statsItems = statsData?.items ?? []
-  const statsById = new Map(statsItems.map((v) => [v?.id, v?.statistics]))
+  const statsById = new Map(statsItems.map((v) => [v?.id, v]))
 
-  return searchItems.map((item) => {
+  const mappedItems = searchItems.map((item) => {
     const videoId = item?.id?.videoId
-    const stats = statsById.get(videoId)
+    const videoDetails = statsById.get(videoId)
+    const stats = videoDetails?.statistics
+    const durationStr = videoDetails?.contentDetails?.duration || ''
 
     const viewCount = stats?.viewCount != null ? Number(stats.viewCount) : 0
     const likeCount = stats?.likeCount != null ? Number(stats.likeCount) : 0
 
     return {
       ...item,
+      durationStr,
       statistics: {
         ...(item.statistics ?? {}),
         viewCount,
@@ -83,24 +91,41 @@ async function fetchSearchWithStats(searchQuery, daysAgo = 2) {
       likeCount,
     }
   })
+
+  return mappedItems.filter((item) => {
+    const dur = item.durationStr || ''
+    const isShortDuration = dur.startsWith('PT') && !dur.includes('M') && !dur.includes('H')
+    return !isShortDuration
+  })
 }
 
-export async function searchByKeywords(topic, _contentType = 'videos', daysAgo = 2) {
+export async function searchByKeywords(topic, _contentType = 'videos', daysAgo = 2, maxResults = 12) {
   try {
     const q = String(topic ?? '').trim()
     if (!q) return []
-    return await fetchSearchWithStats(q, daysAgo)
+    return await fetchSearchWithStats(q, daysAgo, null, maxResults)
   } catch (e) {
     console.log(e)
     return []
   }
 }
 
-export async function searchByChannel(channelUrlOrHandle, _contentType = 'videos', daysAgo = 2) {
+export async function searchByChannel(channelUrlOrHandle, _contentType = 'videos', daysAgo = 2, maxResults = 12) {
   try {
     const handle = extractHandleForChannelSearch(channelUrlOrHandle)
     if (!handle) return []
-    return await fetchSearchWithStats(handle, daysAgo)
+
+    const apiKey = import.meta.env.VITE_YOUTUBE_API_KEY
+    const handleWithAt = handle.startsWith('@') ? handle : `@${handle}`
+    
+    // Resolve channel handle to channelId
+    const { data: channelData } = await axios.get('https://www.googleapis.com/youtube/v3/channels', {
+      params: { part: 'id', forHandle: handleWithAt, key: apiKey }
+    }).catch(() => ({ data: null }))
+    
+    const channelId = channelData?.items?.[0]?.id
+
+    return await fetchSearchWithStats(handle, daysAgo, channelId, maxResults)
   } catch (e) {
     console.log(e)
     return []

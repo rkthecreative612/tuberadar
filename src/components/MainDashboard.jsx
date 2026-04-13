@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { searchByChannel, searchByKeywords } from '../lib/youtube'
 import supabase from '../lib/supabase'
 
@@ -11,6 +11,15 @@ function MainDashboard({ selectedMyChannel, onBackClick }) {
     topCount: 0,
     bestChannel: '—'
   })
+  const [isEditing, setIsEditing] = useState(false)
+  const [editName, setEditName] = useState('')
+
+  useEffect(() => {
+    if (selectedMyChannel) {
+      setEditName(selectedMyChannel.name || '')
+      setIsEditing(false)
+    }
+  }, [selectedMyChannel])
 
   useEffect(() => {
     if (!selectedMyChannel) return
@@ -32,36 +41,82 @@ function MainDashboard({ selectedMyChannel, onBackClick }) {
           return
         }
 
-        const promises = competitors.map(async (comp) => {
+        let removedIds = []
+        try {
+          removedIds = JSON.parse(localStorage.getItem('removed_videos') || '[]')
+        } catch(e) {}
+
+        const mapItem = (item, comp, phase) => {
+          const viewCount = item.viewCount ?? 0;
+          return {
+            compName: comp.name,
+            title: item.snippet.title,
+            channelName: item.snippet.channelTitle,
+            videoId: item.id.videoId,
+            thumbnail: `https://img.youtube.com/vi/${item.id.videoId}/mqdefault.jpg`,
+            publishedAt: item.snippet.publishedAt,
+            viewCount: viewCount,
+            likeCount: item.likeCount ?? 0,
+            phase
+          }
+        }
+
+        // Phase 1: Last 48 hrs
+        const promisesPhase1 = competitors.map(async (comp) => {
           let items = []
           if (comp.channel_url) {
-             items = await searchByChannel(comp.channel_url)
+             items = await searchByChannel(comp.channel_url, 'videos', 2, 12)
           } else if (comp.keywords) {
-             items = await searchByKeywords(comp.keywords)
+             items = await searchByKeywords(comp.keywords, 'videos', 2, 12)
           }
-
           if (!items) return []
-
-          return items.map(item => {
-            const viewCount = item.viewCount ?? 0;
-            return {
-              compName: comp.name,
-              title: item.snippet.title,
-              channelName: item.snippet.channelTitle,
-              videoId: item.id.videoId,
-              thumbnail: `https://img.youtube.com/vi/${item.id.videoId}/mqdefault.jpg`,
-              publishedAt: item.snippet.publishedAt,
-              viewCount: viewCount,
-              likeCount: item.likeCount ?? 0,
-            }
-          })
+          return items.map(item => mapItem(item, comp, 1))
         })
 
-        const resultsArray = await Promise.all(promises)
-        let allVideos = resultsArray.flat()
+        const p1Results = await Promise.all(promisesPhase1)
+        let phase1Videos = p1Results.flat().filter(v => !removedIds.includes(v.videoId))
+        phase1Videos.sort((a, b) => b.viewCount - a.viewCount)
 
-        // Sort by views descending
-        allVideos.sort((a, b) => b.viewCount - a.viewCount)
+        // Phase 2: Top performing last 30 days
+        let phase2Videos = []
+        if (phase1Videos.length < 12) {
+          const needed = 12 - phase1Videos.length;
+          const slotsPerChannel = Math.ceil(needed / competitors.length);
+
+          const promisesPhase2 = competitors.map(async (comp) => {
+            let items = []
+            if (comp.channel_url) {
+               items = await searchByChannel(comp.channel_url, 'videos', 30, 15)
+            } else if (comp.keywords) {
+               items = await searchByKeywords(comp.keywords, 'videos', 30, 15)
+            }
+            if (!items) return []
+            let mapped = items.map(item => mapItem(item, comp, 2))
+            
+            // Filter out removed and duplicates from Phase 1
+            mapped = mapped.filter(v => 
+              !removedIds.includes(v.videoId) && 
+              !phase1Videos.some(p1 => p1.videoId === v.videoId)
+            )
+            mapped.sort((a, b) => b.viewCount - a.viewCount)
+            return mapped.slice(0, slotsPerChannel)
+          })
+
+          const p2Results = await Promise.all(promisesPhase2)
+          phase2Videos = p2Results.flat().sort((a, b) => b.viewCount - a.viewCount).slice(0, needed)
+        }
+
+        let allVideos = [...phase1Videos, ...phase2Videos]
+
+        // Safety dedup
+        const seenIds = new Set();
+        allVideos = allVideos.filter(v => {
+          if (seenIds.has(v.videoId)) return false;
+          seenIds.add(v.videoId);
+          return true;
+        });
+
+        allVideos = allVideos.slice(0, 12);
 
         if (!isMounted) return
 
@@ -75,7 +130,7 @@ function MainDashboard({ selectedMyChannel, onBackClick }) {
         }
 
         setStats({
-          recentCount: allVideos.length,
+          recentCount: phase1Videos.length,
           topCount: topCount,
           bestChannel: bestChannelName
         });
@@ -105,6 +160,36 @@ function MainDashboard({ selectedMyChannel, onBackClick }) {
 
     await supabase.from('my_channels').delete().eq('id', selectedMyChannel.id)
     if (onBackClick) onBackClick()
+  }
+
+  const handleEditSave = async () => {
+    if (!selectedMyChannel || !editName.trim()) return
+    
+    try {
+      const { error: updateError } = await supabase
+        .from('my_channels')
+        .update({ name: editName })
+        .eq('id', selectedMyChannel.id)
+        
+      if (updateError) throw updateError
+      
+      selectedMyChannel.name = editName
+      setIsEditing(false)
+    } catch (err) {
+      console.error(err)
+      alert('Failed to update channel name')
+    }
+  }
+
+  const handleRemove = (videoId) => {
+    let removedIds = []
+    try {
+      removedIds = JSON.parse(localStorage.getItem('removed_videos') || '[]')
+    } catch(e) {}
+    removedIds.push(videoId)
+    localStorage.setItem('removed_videos', JSON.stringify(removedIds))
+    
+    setVideos(prev => prev.filter(v => v.videoId !== videoId))
   }
 
   const timeAgo = (dateString) => {
@@ -257,6 +342,45 @@ function MainDashboard({ selectedMyChannel, onBackClick }) {
     fontWeight: 600
   }
 
+  const sectionLabelContainerStyle = {
+    gridColumn: '1 / -1',
+    margin: '12px 0 4px 0',
+  }
+
+  const phase1LabelStyle = {
+    fontSize: '13px',
+    color: '#ff5252',
+    fontWeight: 'bold',
+    textTransform: 'uppercase',
+    letterSpacing: '0.5px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px'
+  }
+
+  const phase2LabelStyle = {
+    fontSize: '13px',
+    color: '#ffd700',
+    fontWeight: 'bold',
+    textTransform: 'uppercase',
+    letterSpacing: '0.5px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px'
+  }
+
+  const removeButtonStyle = {
+    padding: '8px 12px',
+    backgroundColor: '#8b0000',
+    color: '#fff',
+    border: '1px solid #600000',
+    borderRadius: '6px',
+    fontSize: '12px',
+    cursor: 'pointer',
+    textAlign: 'center',
+    fontWeight: 'bold'
+  }
+
   const sectionHeaderStyle = {
     margin: 0,
     fontSize: '20px',
@@ -352,21 +476,55 @@ function MainDashboard({ selectedMyChannel, onBackClick }) {
 
   return (
     <main style={rootStyle}>
-      <header style={topBarStyle}>
-        <div style={topBarLeftStyle}>
-          {onBackClick && (
-            <button type="button" style={backButtonStyle} onClick={onBackClick}>
-              &larr; Back
-            </button>
-          )}
-          <h1 style={topTitleStyle}>{selectedMyChannel?.name || 'Dashboard'}</h1>
-        </div>
-        
-        <div style={topBarRightStyle}>
-          <button type="button" style={actionButtonStyle}>Edit</button>
-          <button type="button" style={dangerButtonStyle} onClick={handleDelete}>Delete</button>
-        </div>
-      </header>
+      {isEditing ? (
+        <header style={topBarStyle}>
+          <div style={topBarLeftStyle}>
+            {onBackClick && (
+              <button type="button" style={backButtonStyle} onClick={onBackClick}>
+                &larr; Back
+              </button>
+            )}
+            <input
+              type="text"
+              value={editName}
+              onChange={(e) => setEditName(e.target.value)}
+              style={{
+                padding: '6px 12px',
+                fontSize: '18px',
+                fontWeight: 'bold',
+                borderRadius: '6px',
+                border: '1px solid #444',
+                backgroundColor: '#222',
+                color: '#fff',
+                outline: 'none',
+                flex: 1,
+                minWidth: '200px'
+              }}
+              autoFocus
+            />
+          </div>
+          <div style={topBarRightStyle}>
+            <button type="button" style={actionButtonStyle} onClick={handleEditSave}>Save</button>
+            <button type="button" style={{ ...actionButtonStyle, backgroundColor: 'transparent', borderColor: '#444' }} onClick={() => setIsEditing(false)}>Cancel</button>
+          </div>
+        </header>
+      ) : (
+        <header style={topBarStyle}>
+          <div style={topBarLeftStyle}>
+            {onBackClick && (
+              <button type="button" style={backButtonStyle} onClick={onBackClick}>
+                &larr; Back
+              </button>
+            )}
+            <h1 style={topTitleStyle}>{selectedMyChannel?.name || 'Dashboard'}</h1>
+          </div>
+          
+          <div style={topBarRightStyle}>
+            <button type="button" style={actionButtonStyle} onClick={() => setIsEditing(true)}>Edit</button>
+            <button type="button" style={dangerButtonStyle} onClick={handleDelete}>Delete</button>
+          </div>
+        </header>
+      )}
 
       <div style={scrollAreaStyle}>
         
@@ -408,38 +566,70 @@ function MainDashboard({ selectedMyChannel, onBackClick }) {
               <p style={{ color: '#888' }}>No videos found.</p>
             ) : (
               videos.map((v, idx) => {
+                const isFirstPhase1 = v.phase === 1 && idx === 0;
+                const isFirstPhase2 = v.phase === 2 && (idx === 0 || videos[idx - 1].phase === 1);
                 const score = calcScore(v);
                 const scoreColor = getScoreColor(score);
                 return (
-                  <div key={`${v.videoId}-${idx}`} style={cardStyle}>
-                    <div style={thumbnailContainerStyle}>
-                      <img src={v.thumbnail} alt={v.title} style={thumbnailStyle} />
-                      <span style={timePillStyle}>{timeAgo(v.publishedAt)}</span>
-                    </div>
-                    <p style={compLabelStyle}>{v.compName || v.channelName} • {formatCompact(v.viewCount)} views</p>
-                    <p style={videoTitleStyle}>{v.title}</p>
-                    
-                    <div style={{ marginTop: 'auto', marginBottom: '8px' }}>
-                      <span style={{
-                        padding: '4px 8px',
-                        borderRadius: '6px',
-                        fontSize: '12px',
-                        fontWeight: 'bold',
-                        color: scoreColor,
-                        backgroundColor: `${scoreColor}20`,
-                        display: 'inline-block'
-                      }}>
-                        Score: {score}%
-                      </span>
-                    </div>
+                  <React.Fragment key={`${v.videoId}-${idx}`}>
+                    {isFirstPhase1 && (
+                      <div style={sectionLabelContainerStyle}>
+                        <span style={phase1LabelStyle}>🔴 Recent — last 48hrs</span>
+                      </div>
+                    )}
+                    {isFirstPhase2 && (
+                      <div style={sectionLabelContainerStyle}>
+                        <span style={phase2LabelStyle}>⭐ Top performing — last 30 days</span>
+                      </div>
+                    )}
+                    <div style={cardStyle}>
+                      <div style={thumbnailContainerStyle}>
+                        <div 
+                          onClick={() => window.open(`https://www.youtube.com/watch?v=${v.videoId}`, '_blank')}
+                          style={{height: '100%', cursor: 'pointer'}}
+                        >
+                          <img src={v.thumbnail} alt={v.title} style={thumbnailStyle} />
+                        </div>
+                        <span style={timePillStyle}>{timeAgo(v.publishedAt)}</span>
+                      </div>
+                      <p style={compLabelStyle}>{v.compName || v.channelName} • {formatCompact(v.viewCount)} views</p>
+                      <p 
+                        style={{...videoTitleStyle, cursor: 'pointer', textDecoration: 'underline'}}
+                        onClick={() => window.open(`https://www.youtube.com/watch?v=${v.videoId}`, '_blank')}
+                      >
+                        {v.title}
+                      </p>
+                      
+                      <div style={{ marginTop: 'auto', marginBottom: '8px' }}>
+                        <span style={{
+                          padding: '4px 8px',
+                          borderRadius: '6px',
+                          fontSize: '12px',
+                          fontWeight: 'bold',
+                          color: scoreColor,
+                          backgroundColor: `${scoreColor}20`,
+                          display: 'inline-block'
+                        }}>
+                          Score: {score}%
+                        </span>
+                      </div>
 
-                    <button 
-                      style={brainstormButtonStyle}
-                      onClick={() => console.log('Move to Brainstorm clicked:', v.title)}
-                    >
-                      Move to Brainstorm
-                    </button>
-                  </div>
+                      <div style={{ display: 'flex', gap: '8px', marginTop: '0' }}>
+                        <button 
+                          style={{ ...brainstormButtonStyle, marginTop: 0, flex: 1 }}
+                          onClick={() => console.log('Move to Brainstorm clicked:', v.title)}
+                        >
+                          Move to Brainstorm
+                        </button>
+                        <button 
+                          style={removeButtonStyle}
+                          onClick={() => handleRemove(v.videoId)}
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    </div>
+                  </React.Fragment>
                 );
               })
             )}
