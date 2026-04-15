@@ -13,12 +13,28 @@ function MainDashboard({ selectedMyChannel, onBackClick }) {
   })
   const [isEditing, setIsEditing] = useState(false)
   const [editName, setEditName] = useState('')
+  const [movedVideoIds, setMovedVideoIds] = useState(new Set())
 
   useEffect(() => {
     if (selectedMyChannel) {
       setEditName(selectedMyChannel.name || '')
       setIsEditing(false)
     }
+  }, [selectedMyChannel])
+
+  useEffect(() => {
+    if (!selectedMyChannel) return
+    const fetchMovedVideos = async () => {
+      const { data, error } = await supabase
+        .from('brainstorm_items')
+        .select('video_id')
+        .eq('topic_id', selectedMyChannel.id)
+      
+      if (!error && data) {
+        setMovedVideoIds(new Set(data.map(d => d.video_id)))
+      }
+    }
+    fetchMovedVideos()
   }, [selectedMyChannel])
 
   useEffect(() => {
@@ -160,6 +176,37 @@ function MainDashboard({ selectedMyChannel, onBackClick }) {
 
     await supabase.from('my_channels').delete().eq('id', selectedMyChannel.id)
     if (onBackClick) onBackClick()
+  }
+
+  const handleMoveToBrainstorm = async (v) => {
+    if (movedVideoIds.has(v.videoId) || !selectedMyChannel) return
+
+    try {
+      const score = calcScore(v)
+      const { error } = await supabase.from('brainstorm_items').insert({
+        topic_id: selectedMyChannel.id,
+        video_id: v.videoId,
+        title: v.title,
+        thumbnail: v.thumbnail,
+        likes: String(v.likeCount || 0),
+        comments: '0',
+        score: String(score),
+        description: "",
+      })
+
+      if (error) {
+        console.error('Insert error:', error)
+        return
+      }
+
+      setMovedVideoIds(prev => {
+        const next = new Set(prev)
+        next.add(v.videoId)
+        return next
+      })
+    } catch (err) {
+      console.error('Failed to move to brainstorm:', err)
+    }
   }
 
   const handleEditSave = async () => {
@@ -582,53 +629,65 @@ function MainDashboard({ selectedMyChannel, onBackClick }) {
                         <span style={phase2LabelStyle}>⭐ Top performing — last 30 days</span>
                       </div>
                     )}
-                    <div style={cardStyle}>
-                      <div style={thumbnailContainerStyle}>
-                        <div 
-                          onClick={() => window.open(`https://www.youtube.com/watch?v=${v.videoId}`, '_blank')}
-                          style={{height: '100%', cursor: 'pointer'}}
-                        >
-                          <img src={v.thumbnail} alt={v.title} style={thumbnailStyle} />
-                        </div>
-                        <span style={timePillStyle}>{timeAgo(v.publishedAt)}</span>
-                      </div>
-                      <p style={compLabelStyle}>{v.compName || v.channelName} • {formatCompact(v.viewCount)} views</p>
-                      <p 
-                        style={{...videoTitleStyle, cursor: 'pointer', textDecoration: 'underline'}}
-                        onClick={() => window.open(`https://www.youtube.com/watch?v=${v.videoId}`, '_blank')}
-                      >
-                        {v.title}
-                      </p>
-                      
-                      <div style={{ marginTop: 'auto', marginBottom: '8px' }}>
-                        <span style={{
-                          padding: '4px 8px',
-                          borderRadius: '6px',
-                          fontSize: '12px',
-                          fontWeight: 'bold',
-                          color: scoreColor,
-                          backgroundColor: `${scoreColor}20`,
-                          display: 'inline-block'
-                        }}>
-                          Score: {score}%
-                        </span>
-                      </div>
+                    {(() => {
+                      const isMoved = movedVideoIds.has(v.videoId);
+                      return (
+                        <div style={cardStyle}>
+                          <div style={thumbnailContainerStyle}>
+                            <div 
+                              onClick={() => window.open(`https://www.youtube.com/watch?v=${v.videoId}`, '_blank')}
+                              style={{height: '100%', cursor: 'pointer'}}
+                            >
+                              <img src={v.thumbnail} alt={v.title} style={thumbnailStyle} />
+                            </div>
+                            <span style={timePillStyle}>{timeAgo(v.publishedAt)}</span>
+                          </div>
+                          <p style={compLabelStyle}>{v.compName || v.channelName} • {formatCompact(v.viewCount)} views</p>
+                          <p 
+                            style={{...videoTitleStyle, cursor: 'pointer'}}
+                            onClick={() => window.open(`https://www.youtube.com/watch?v=${v.videoId}`, '_blank')}
+                          >
+                            {v.title}
+                          </p>
+                          
+                          <div style={{ marginTop: 'auto', marginBottom: '8px' }}>
+                            <span style={{
+                              padding: '4px 8px',
+                              borderRadius: '6px',
+                              fontSize: '12px',
+                              fontWeight: 'bold',
+                              color: scoreColor,
+                              backgroundColor: `${scoreColor}20`,
+                              display: 'inline-block'
+                            }}>
+                              Score: {score}%
+                            </span>
+                          </div>
 
-                      <div style={{ display: 'flex', gap: '8px', marginTop: '0' }}>
-                        <button 
-                          style={{ ...brainstormButtonStyle, marginTop: 0, flex: 1 }}
-                          onClick={() => console.log('Move to Brainstorm clicked:', v.title)}
-                        >
-                          Move to Brainstorm
-                        </button>
-                        <button 
-                          style={removeButtonStyle}
-                          onClick={() => handleRemove(v.videoId)}
-                        >
-                          Remove
-                        </button>
-                      </div>
-                    </div>
+                          <div style={{ display: 'flex', gap: '8px', marginTop: '0' }}>
+                            <button 
+                              style={{ 
+                                ...brainstormButtonStyle, 
+                                marginTop: 0, 
+                                flex: 1,
+                                ...(isMoved ? { backgroundColor: '#1a1a1a', color: '#4caf50', border: '1px solid #4caf50', cursor: 'default' } : {})
+                              }}
+                              onClick={() => {
+                                if (!isMoved) handleMoveToBrainstorm(v)
+                              }}
+                            >
+                              {isMoved ? '✅ Moved' : 'Move to Brainstorm'}
+                            </button>
+                            <button 
+                              style={removeButtonStyle}
+                              onClick={() => handleRemove(v.videoId)}
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </React.Fragment>
                 );
               })
