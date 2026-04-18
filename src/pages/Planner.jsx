@@ -16,6 +16,7 @@ function Planner() {
   const [topics, setTopics] = useState([])
   const [byTopic, setByTopic] = useState({})
   const [expandedCardId, setExpandedCardId] = useState(null)
+  const [viewModal, setViewModal] = useState({ open: false, topicId: null, video: null })
   const [addModal, setAddModal] = useState({ open: false, topic: null })
   const [addForm, setAddForm] = useState({
     title: '',
@@ -24,7 +25,7 @@ function Planner() {
     notes: '',
     bindedLinks: [''],
   })
-  const [addErrors, setAddErrors] = useState({ title: '', videoLink: '' })
+  const [addErrors, setAddErrors] = useState({ title: '', description: '' })
   const [savingById, setSavingById] = useState({})
   const [saveErrorById, setSaveErrorById] = useState({})
   const [deleteModal, setDeleteModal] = useState({ open: false, topicId: null, cardId: null })
@@ -50,25 +51,24 @@ function Planner() {
   function openAddModal(topic) {
     setAddModal({ open: true, topic })
     setAddForm({ title: '', videoLink: '', description: '', notes: '', bindedLinks: [''] })
-    setAddErrors({ title: '', videoLink: '' })
+    setAddErrors({ title: '', description: '' })
   }
 
   function closeAddModal() {
     setAddModal({ open: false, topic: null })
     setAddForm({ title: '', videoLink: '', description: '', notes: '', bindedLinks: [''] })
-    setAddErrors({ title: '', videoLink: '' })
+    setAddErrors({ title: '', description: '' })
   }
 
   async function addPlannerVideo() {
     const title = addForm.title.trim()
-    const videoLink = addForm.videoLink.trim()
 
     const next = {
       title: title ? '' : 'Title is required',
-      videoLink: videoLink ? '' : 'Video Link is required',
+      description: addForm.description.trim() ? '' : 'Description is required',
     }
     setAddErrors(next)
-    if (next.title || next.videoLink) return
+    if (next.title || next.description) return
 
     const topic = addModal.topic
     if (!topic?.id) return
@@ -100,7 +100,7 @@ function Planner() {
       topic_id: topic.id,
       video_title: title,
       video_description: addForm.description.trim(),
-      video_link: videoLink,
+      video_link: '',
       binded_videos: binded,
       notes: addForm.notes.trim(),
       position: nextPosition,
@@ -289,17 +289,23 @@ function Planner() {
     backgroundColor: '#0a0a0a',
   }
 
-  const actionsStyle = { display: 'flex', gap: '8px', flexWrap: 'wrap' }
+  const actionsStyle = {
+    display: 'flex',
+    gap: '12px',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    marginTop: '12px',
+  }
 
   const btnStyle = {
-    padding: '8px 10px',
+    padding: '12px 20px',
     borderRadius: '10px',
     border: '1px solid #333',
     backgroundColor: '#fff',
     color: '#000',
     cursor: 'pointer',
     fontWeight: 750,
-    fontSize: '12px',
+    fontSize: '13px',
   }
 
   const btnPrimaryStyle = { ...btnStyle }
@@ -459,7 +465,7 @@ function Planner() {
                               const u = new URL(v.video_link)
                               videoId = u.searchParams.get('v')
                             }
-                          } catch {}
+                          } catch { }
                           const thumbUrl = videoId ? `https://img.youtube.com/vi/${videoId}/mqdefault.jpg` : ''
 
                           return (
@@ -468,122 +474,27 @@ function Planner() {
                                 <div className="plannerCard" style={cardStyle} {...attributes}>
                                   {thumbUrl ? <img src={thumbUrl} alt="" style={thumbStyle} /> : null}
 
-                                <div style={cardBodyStyle}>
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                    <button
-                                      type="button"
-                                      ref={setActivatorNodeRef}
-                                      {...listeners}
-                                      title="Drag"
-                                      style={{
-                                        width: '28px',
-                                        height: '28px',
-                                        borderRadius: '8px',
-                                        border: '1px solid #333',
-                                        backgroundColor: '#fff',
-                                        color: '#000',
-                                        cursor: 'grab',
-                                        fontWeight: 900,
-                                        lineHeight: 1,
-                                      }}
-                                    >
-                                      ::
-                                    </button>
-                                    <h3 style={h3Style}>{v.video_title || 'Untitled'}</h3>
-                                  </div>
-
-                                  {isExpanded ? (
-                                    <>
-                                      <div>
-                                        <div style={fieldLabelStyle}>Title</div>
-                                        <input
-                                          style={inputStyle}
-                                          value={v.video_title || ''}
-                                          onChange={(e) => patchCardLocal(t.id, v.id, { video_title: e.target.value })}
-                                          onBlur={(e) => commitIfChanged(t.id, v, { video_title: e.target.value })}
-                                          onKeyDown={(e) => {
-                                            if (e.key === 'Enter') {
-                                              e.preventDefault()
-                                              e.currentTarget.blur()
-                                            }
-                                          }}
-                                        />
-                                      </div>
-
-                                      <div>
-                                        <div style={fieldLabelStyle}>Desc</div>
-                                        <textarea
-                                          style={textareaStyle}
-                                          value={v.video_description || ''}
-                                          onChange={(e) =>
-                                            patchCardLocal(t.id, v.id, { video_description: e.target.value })
-                                          }
-                                          onBlur={(e) => commitIfChanged(t.id, v, { video_description: e.target.value })}
-                                          onKeyDown={(e) => {
-                                            // Enter saves; Shift+Enter inserts newline.
-                                            if (e.key === 'Enter' && !e.shiftKey) {
-                                              e.preventDefault()
-                                              e.currentTarget.blur()
-                                            }
-                                          }}
-                                        />
-                                      </div>
-
-                                      <div>
-                                        <div style={fieldLabelStyle}>Binded videos</div>
-                                        <div style={bindRowStyle}>
-                                          {binded.map((b, idx) => (
-                                            <img
-                                              key={b.video_id || b.video_link || idx}
-                                              src={b.thumbnail || ''}
-                                              alt=""
-                                              style={bindThumbStyle}
-                                              onClick={() => {
-                                                const url =
-                                                  b.video_link ||
-                                                  (b.video_id ? `https://www.youtube.com/watch?v=${b.video_id}` : '')
-                                                if (url) window.open(url, '_blank')
-                                              }}
-                                            />
-                                          ))}
-                                        </div>
-                                      </div>
-
-                                      <div>
-                                        <div style={fieldLabelStyle}>Notes</div>
-                                        <textarea
-                                          style={textareaStyle}
-                                          value={v.notes || ''}
-                                          onChange={(e) => patchCardLocal(t.id, v.id, { notes: e.target.value })}
-                                          onBlur={(e) => commitIfChanged(t.id, v, { notes: e.target.value })}
-                                        />
-                                      </div>
-                                    </>
-                                  ) : null}
-
-                                  {isExpanded ? (
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                      {isSaving ? <span style={{ color: '#9a9a9a', fontSize: '12px' }}>Saving…</span> : null}
-                                      {saveError ? <span style={{ color: '#ef4444', fontSize: '12px' }}>{saveError}</span> : null}
+                                  <div style={cardBodyStyle}>
+                                    <div ref={setActivatorNodeRef} {...listeners} style={{ width: '100%', cursor: 'grab' }}>
+                                      <h3 style={h3Style}>{v.video_title || 'Untitled'}</h3>
                                     </div>
-                                  ) : null}
 
-                                  <div style={actionsStyle}>
-                                    <button
-                                      type="button"
-                                      style={btnStyle}
-                                      onClick={() => setExpandedCardId((cur) => (cur === v.id ? null : v.id))}
-                                    >
-                                      View
-                                    </button>
-                                    <button type="button" style={btnPrimaryStyle} onClick={() => navigate('/scheduler')}>
-                                      Schedule
-                                    </button>
-                                    <button type="button" style={btnDangerStyle} onClick={() => deleteCard(t.id, v.id)}>
-                                      Delete
-                                    </button>
+                                    <div style={actionsStyle}>
+                                      <button
+                                        type="button"
+                                        style={btnStyle}
+                                        onClick={() => setViewModal({ open: true, topicId: t.id, video: v })}
+                                      >
+                                        View
+                                      </button>
+                                      <button type="button" style={btnPrimaryStyle} onClick={() => navigate('/scheduler')}>
+                                        Schedule
+                                      </button>
+                                      <button type="button" style={btnDangerStyle} onClick={() => deleteCard(t.id, v.id)}>
+                                        Delete
+                                      </button>
+                                    </div>
                                   </div>
-                                </div>
                                 </div>
                               )}
                             </SortableCard>
@@ -595,15 +506,15 @@ function Planner() {
                 )
               })}
 
-            {row.length < 3
-              ? Array.from({ length: 3 - row.length }).map((_, i) => (
+              {row.length < 3
+                ? Array.from({ length: 3 - row.length }).map((_, i) => (
                   <div key={`spacer-${i}`} style={{ border: '1px dashed #333', borderRadius: '8px' }} />
                 ))
-              : null}
-          </div>
-        ))}
+                : null}
+            </div>
+          ))}
+        </div>
       </div>
-    </div>
 
       {addModal.open ? (
         <div
@@ -665,27 +576,18 @@ function Planner() {
               </div>
 
               <div>
-                <div style={fieldLabelStyle}>Video Link (YouTube URL):</div>
-                <input
-                  style={inputStyle}
-                  value={addForm.videoLink}
-                  onChange={(e) => {
-                    setAddForm((p) => ({ ...p, videoLink: e.target.value }))
-                    if (addErrors.videoLink) setAddErrors((p) => ({ ...p, videoLink: '' }))
-                  }}
-                />
-                {addErrors.videoLink ? (
-                  <div style={{ color: '#ef4444', fontSize: '12px', marginTop: '6px' }}>{addErrors.videoLink}</div>
-                ) : null}
-              </div>
-
-              <div>
                 <div style={fieldLabelStyle}>Description:</div>
                 <textarea
                   style={textareaStyle}
                   value={addForm.description}
-                  onChange={(e) => setAddForm((p) => ({ ...p, description: e.target.value }))}
+                  onChange={(e) => {
+                    setAddForm((p) => ({ ...p, description: e.target.value }))
+                    if (addErrors.description) setAddErrors((p) => ({ ...p, description: '' }))
+                  }}
                 />
+                {addErrors.description ? (
+                  <div style={{ color: '#ef4444', fontSize: '12px', marginTop: '6px' }}>{addErrors.description}</div>
+                ) : null}
               </div>
 
               <div>
@@ -818,6 +720,43 @@ function Planner() {
           }}
         >
           {toast.text}
+        </div>
+      ) : null}
+
+      {viewModal.open && viewModal.video ? (
+        <div onMouseDown={(e) => { if (e.target === e.currentTarget) setViewModal({ open: false, topicId: null, video: null }) }} style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '18px', zIndex: 50 }}>
+          <div style={{ width: 'min(600px, 100%)', backgroundColor: '#101010', border: '1px solid #333', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 24px 80px rgba(0,0,0,0.55)' }}>
+            <div style={{ padding: '16px', borderBottom: '1px solid #333', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 style={{ margin: 0, color: '#fff' }}>{viewModal.video.video_title || 'Untitled'}</h3>
+              <button onClick={() => setViewModal({ open: false, topicId: null, video: null })} style={{ background: 'none', border: 'none', color: '#888', fontSize: '20px', cursor: 'pointer' }}>×</button>
+            </div>
+            <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px', maxHeight: '70vh', overflowY: 'auto' }}>
+              <div>
+                <label style={{ fontSize: '12px', color: '#888', marginBottom: '6px', display: 'block' }}>Title</label>
+                <input style={{ width: '100%', padding: '10px', border: '1px solid #333', backgroundColor: '#1a1a1a', color: 'white', borderRadius: '8px', boxSizing: 'border-box' }} value={viewModal.video.video_title || ''} onChange={(e) => setViewModal(p => ({ ...p, video: { ...p.video, video_title: e.target.value } }))} onBlur={() => { if (viewModal.video.id) { patchCardLocal(viewModal.topicId, viewModal.video.id, { video_title: viewModal.video.video_title }); supabase.from('planner_videos').update({ video_title: viewModal.video.video_title }).eq('id', viewModal.video.id).then() } }} />
+              </div>
+              <div>
+                <label style={{ fontSize: '12px', color: '#888', marginBottom: '6px', display: 'block' }}>Description</label>
+                <textarea style={{ width: '100%', padding: '10px', border: '1px solid #333', backgroundColor: '#1a1a1a', color: 'white', borderRadius: '8px', boxSizing: 'border-box', minHeight: '100px', fontFamily: 'sans-serif' }} value={viewModal.video.video_description || ''} onChange={(e) => setViewModal(p => ({ ...p, video: { ...p.video, video_description: e.target.value } }))} onBlur={() => { if (viewModal.video.id) { patchCardLocal(viewModal.topicId, viewModal.video.id, { video_description: viewModal.video.video_description }); supabase.from('planner_videos').update({ video_description: viewModal.video.video_description }).eq('id', viewModal.video.id).then() } }} />
+              </div>
+              <div>
+                <label style={{ fontSize: '12px', color: '#888', marginBottom: '6px', display: 'block' }}>Binded Videos</label>
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                  {(Array.isArray(viewModal.video.binded_videos) ? viewModal.video.binded_videos : []).map((b, idx) => (
+                    <img key={idx} src={b.thumbnail || ''} alt="" style={{ width: '60px', height: '60px', borderRadius: '8px', border: '1px solid #333', cursor: 'pointer', objectFit: 'cover' }} onClick={() => { const url = b.video_link || (b.video_id ? `https://www.youtube.com/watch?v=${b.video_id}` : ''); if (url) window.open(url, '_blank') }} />
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label style={{ fontSize: '12px', color: '#888', marginBottom: '6px', display: 'block' }}>Notes</label>
+                <textarea style={{ width: '100%', padding: '10px', border: '1px solid #333', backgroundColor: '#1a1a1a', color: 'white', borderRadius: '8px', boxSizing: 'border-box', minHeight: '80px', fontFamily: 'sans-serif' }} value={viewModal.video.notes || ''} onChange={(e) => setViewModal(p => ({ ...p, video: { ...p.video, notes: e.target.value } }))} onBlur={() => { if (viewModal.video.id) { patchCardLocal(viewModal.topicId, viewModal.video.id, { notes: viewModal.video.notes }); supabase.from('planner_videos').update({ notes: viewModal.video.notes }).eq('id', viewModal.video.id).then() } }} />
+              </div>
+            </div>
+            <div style={{ padding: '16px', borderTop: '1px solid #333', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+              <button onClick={() => navigate('/scheduler')} style={{ padding: '10px 20px', backgroundColor: '#fff', color: '#000', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>Schedule</button>
+              <button onClick={() => { supabase.from('planner_videos').delete().eq('id', viewModal.video.id).then(() => { setViewModal({ open: false, topicId: null, video: null }); setByTopic(p => ({ ...p, [viewModal.topicId]: (p[viewModal.topicId] || []).filter(v => v.id !== viewModal.video.id) })) }) }} style={{ padding: '10px 20px', backgroundColor: '#ef4444', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>Delete</button>
+            </div>
+          </div>
         </div>
       ) : null}
     </DndContext>

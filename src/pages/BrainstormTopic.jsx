@@ -265,8 +265,8 @@ const BrainstormTopic = ({ topic: topicProp }) => {
 
       const { error } = await supabase.from('planner_videos').insert({
         topic_id: activeTopicId,
-        title: ideaTitle.trim(),
-        description: ideaDescription.trim(),
+        video_title: ideaTitle.trim(),
+        video_description: ideaDescription.trim(),
         binded_videos: binded,
         notes: '',
         position: 0,
@@ -274,12 +274,20 @@ const BrainstormTopic = ({ topic: topicProp }) => {
 
       if (error) throw error;
 
+      // Delete the brainstorm_items entry
+      await supabase.from('brainstorm_items').delete().eq('id', selectedVideo.id);
+
+      // Remove from local state
+      const remainingVideos = videos.filter(v => v.id !== selectedVideo.id);
+      setVideos(remainingVideos);
+      setSelectedVideo(remainingVideos.length > 0 ? remainingVideos[0] : null);
+
       setShowPlannerSuccess(true);
       setTimeout(() => setShowPlannerSuccess(false), 3000);
       setIdeaTitle('');
       setIdeaDescription('');
       setPlannerErrors({ title: '', description: '' });
-      setBoundVideos(selectedVideo ? [selectedVideo] : []);
+      setBoundVideos(remainingVideos.length > 0 ? [remainingVideos[0]] : []);
     } catch (err) {
       console.error('Error moving to planner:', err);
       alert('❌ Failed to move to planner');
