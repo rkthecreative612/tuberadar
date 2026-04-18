@@ -113,6 +113,7 @@ function Sidebar() {
         <Item to="/" label="Home" end />
         <Item to="/brainstorm" label="Brainstorm" />
         <Item to="/planner" label="Planner" />
+        <Item to="/scheduler" label="Scheduler" />
         <Item to="/stats" label="Stats" />
         <Item to="/revenue" label="Revenue tracker" />
       </nav>

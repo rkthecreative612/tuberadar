@@ -4,6 +4,7 @@ import { DndContext, PointerSensor, closestCenter, useSensor, useSensors } from 
 import { SortableContext, useSortable, arrayMove, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import supabase from '../lib/supabase'
+import InlineScheduler from '../components/InlineScheduler'
 
 function chunk(arr, size) {
   const out = []
@@ -26,6 +27,39 @@ const scrollbarStyles = `
     background: #555;
   }
 `;
+
+const COLORS = {
+  // Background colors
+  bgMain: '#0f0f0f',
+  bgCard: '#1a1a1a',
+  bgInput: '#1a1a1a',
+  bgModal: '#101010',
+  bgHover: '#2a2a2a',
+
+  // Text colors
+  textPrimary: '#fff',
+  textSecondary: '#888',
+  textTertiary: '#ccc',
+  textError: '#ef4444',
+  textSuccess: '#22c55e',
+
+  // Border colors
+  borderDefault: '#333',
+  borderLight: '#222',
+
+  // Button colors
+  buttonBgPrimary: '#fff',
+  buttonTextPrimary: '#000',
+  buttonBgSecondary: '#1a1a1a',
+  buttonTextSecondary: '#fff',
+  buttonBgDanger: '#ef4444',
+  buttonBgSuccess: '#22c55e',
+
+  // Status colors
+  success: '#4caf50',
+  error: '#ef4444',
+  warning: '#ff9800',
+}
 
 function Planner() {
   const navigate = useNavigate()
@@ -50,6 +84,7 @@ function Planner() {
   const [savingById, setSavingById] = useState({})
   const [saveErrorById, setSaveErrorById] = useState({})
   const [deleteModal, setDeleteModal] = useState({ open: false, topicId: null, cardId: null })
+  const [schedulingCardId, setSchedulingCardId] = useState(null)
   const [toast, setToast] = useState(null) // { text, kind }
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }))
@@ -119,6 +154,7 @@ function Planner() {
 
     const payload = {
       topic_id: topic.id,
+      status: 'planning',
       video_title: title,
       video_description: description,
       binded_videos: binded,
@@ -166,6 +202,7 @@ function Planner() {
             .from('planner_videos')
             .select('*')
             .eq('topic_id', t.id)
+            .eq('status', 'planning')
             .order('position', { ascending: true })
             .order('created_at', { ascending: true })
           return [t.id, data || []]
@@ -189,10 +226,10 @@ function Planner() {
   const pageStyle = {
     height: '100%',
     overflowY: 'auto',
-    backgroundColor: '#0f0f0f',
+    backgroundColor: COLORS.bgMain,
     padding: '22px',
     boxSizing: 'border-box',
-    color: 'white',
+    color: COLORS.textPrimary,
     fontFamily: 'system-ui, sans-serif',
   }
 
@@ -211,8 +248,8 @@ function Planner() {
   }
 
   const colStyle = {
-    backgroundColor: '#0f0f0f',
-    border: '1px solid #333',
+    backgroundColor: COLORS.bgMain,
+    border: `1px solid ${COLORS.borderDefault}`,
     borderRadius: '8px',
     overflow: 'hidden',
     minHeight: '160px',
@@ -225,8 +262,8 @@ function Planner() {
     alignItems: 'center',
     gap: '10px',
     padding: '12px 12px',
-    borderBottom: '1px solid #333',
-    backgroundColor: '#0f0f0f',
+    borderBottom: `1px solid ${COLORS.borderDefault}`,
+    backgroundColor: COLORS.bgMain,
   }
 
   const colTitleStyle = {
@@ -244,9 +281,9 @@ function Planner() {
     width: '28px',
     height: '28px',
     borderRadius: '8px',
-    border: '1px solid #333',
-    backgroundColor: '#fff',
-    color: '#000',
+    border: `1px solid ${COLORS.borderDefault}`,
+    backgroundColor: COLORS.textPrimary,
+    color: COLORS.buttonTextPrimary,
     cursor: 'pointer',
     fontWeight: 900,
   }
@@ -259,8 +296,8 @@ function Planner() {
   }
 
   const cardStyle = {
-    backgroundColor: '#1a1a1a',
-    border: '1px solid #333',
+    backgroundColor: COLORS.bgCard,
+    border: `1px solid ${COLORS.borderDefault}`,
     borderRadius: '8px',
     overflow: 'hidden',
     display: 'flex',
@@ -272,7 +309,7 @@ function Planner() {
     width: '100%',
     height: '120px',
     objectFit: 'cover',
-    backgroundColor: '#0f0f0f',
+    backgroundColor: COLORS.bgMain,
   }
 
   const cardBodyStyle = {
@@ -290,9 +327,9 @@ function Planner() {
     width: '100%',
     padding: '9px 10px',
     borderRadius: '10px',
-    border: '1px solid #333',
-    backgroundColor: '#0f0f0f',
-    color: 'white',
+    border: `1px solid ${COLORS.borderDefault}`,
+    backgroundColor: COLORS.bgMain,
+    color: COLORS.textPrimary,
     outline: 'none',
     boxSizing: 'border-box',
     fontSize: '12px',
@@ -306,10 +343,10 @@ function Planner() {
     width: '50px',
     height: '50px',
     borderRadius: '8px',
-    border: '1px solid #333',
+    border: `1px solid ${COLORS.borderDefault}`,
     objectFit: 'cover',
     cursor: 'pointer',
-    backgroundColor: '#0a0a0a',
+    backgroundColor: COLORS.bgModal,
   }
 
   const actionsStyle = {
@@ -324,9 +361,9 @@ function Planner() {
   const btnStyle = {
     padding: '8px 16px',
     borderRadius: '6px',
-    border: '1px solid #333',
-    backgroundColor: '#fff',
-    color: '#000',
+    border: `1px solid ${COLORS.borderDefault}`,
+    backgroundColor: COLORS.textPrimary,
+    color: COLORS.buttonTextPrimary,
     cursor: 'pointer',
     fontWeight: 700,
     fontSize: '12px',
@@ -335,8 +372,8 @@ function Planner() {
     minWidth: '80px',
   }
 
-  const btnPrimaryStyle = { ...btnStyle, backgroundColor: '#1a1a1a', color: '#fff', border: '1px solid #555' }
-  const btnDangerStyle = { ...btnStyle, backgroundColor: '#ef4444', border: '1px solid #ef4444', color: '#fff' }
+  const btnPrimaryStyle = { ...btnStyle, backgroundColor: COLORS.bgCard, color: COLORS.textPrimary, border: '1px solid #555' }
+  const btnDangerStyle = { ...btnStyle, backgroundColor: COLORS.buttonBgDanger, border: `1px solid ${COLORS.buttonBgDanger}`, color: COLORS.textPrimary }
 
   const emptyStyle = {
     padding: '12px',
@@ -458,7 +495,7 @@ function Planner() {
     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
       <style>{scrollbarStyles}</style>
       <div className="plannerPage" style={pageStyle}>
-        <div style={{ padding: '0 22px 16px 22px', fontSize: '28px', fontWeight: 'bold', color: 'white' }}>Content Planner</div>
+        <div style={{ padding: '0 22px 16px 22px', fontSize: '28px', fontWeight: 'bold', color: COLORS.textPrimary }}>Content Planner</div>
         <div className="plannerGrid" style={gridStyle}>
           {topicRows.map((row) => (
             <div key={row.map((t) => t.id).join('-')} className="plannerRow" style={rowStyle}>
@@ -508,22 +545,43 @@ function Planner() {
                                       <h3 style={h3Style}>{v.video_title || 'Untitled'}</h3>
                                     </div>
 
-                                    <div style={actionsStyle}>
-                                      <button
-                                        type="button"
-                                        style={btnStyle}
-                                        onClick={() => setViewModal({ open: true, topicId: t.id, video: v })}
-                                      >
-                                        View
-                                      </button>
-                                      <button type="button" style={btnPrimaryStyle} onClick={() => navigate('/scheduler')}>
-                                        Schedule
-                                      </button>
-                                      <button type="button" style={btnDangerStyle} onClick={() => deleteCard(t.id, v.id)}>
-                                        Delete
-                                      </button>
+                                      <div style={actionsStyle}>
+                                        <button
+                                          type="button"
+                                          style={btnStyle}
+                                          onClick={() => setViewModal({ open: true, topicId: t.id, video: v })}
+                                        >
+                                          View
+                                        </button>
+                                        <button 
+                                          type="button" 
+                                          style={btnPrimaryStyle} 
+                                          onClick={() => setSchedulingCardId(schedulingCardId === v.id ? null : v.id)}
+                                        >
+                                          {schedulingCardId === v.id ? 'Cancel' : 'Schedule'}
+                                        </button>
+                                        <button type="button" style={btnDangerStyle} onClick={() => deleteCard(t.id, v.id)}>
+                                          Delete
+                                        </button>
+                                      </div>
+
+                                      {schedulingCardId === v.id && (
+                                        <InlineScheduler 
+                                          video={v}
+                                          onCancel={() => setSchedulingCardId(null)}
+                                          onSave={(videoId) => {
+                                            setSchedulingCardId(null);
+                                            setByTopic(prev => {
+                                              const next = { ...prev };
+                                              Object.keys(next).forEach(tid => {
+                                                next[tid] = next[tid].filter(row => row.id !== videoId);
+                                              });
+                                              return next;
+                                            });
+                                          }}
+                                        />
+                                      )}
                                     </div>
-                                  </div>
                                 </div>
                               )}
                             </SortableCard>
@@ -546,15 +604,15 @@ function Planner() {
       </div>
       {addModal.open ? (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '18px', zIndex: 50 }}>
-          <div style={{ width: 'min(800px, 100%)', backgroundColor: '#101010', border: '1px solid #333', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 24px 80px rgba(0,0,0,0.55)' }}>
-            <div style={{ padding: '16px', borderBottom: '1px solid #333', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h3 style={{ margin: 0, color: '#fff' }}>ADD NEW VIDEO TO {addModal.topic?.name || 'TOPIC'}</h3>
-              <button onClick={closeAddModal} style={{ background: 'none', border: 'none', color: '#888', fontSize: '20px', cursor: 'pointer' }}>×</button>
+          <div style={{ width: 'min(800px, 100%)', backgroundColor: COLORS.bgModal, border: `1px solid ${COLORS.borderDefault}`, borderRadius: '16px', overflow: 'hidden', boxShadow: '0 24px 80px rgba(0,0,0,0.55)' }}>
+            <div style={{ padding: '16px', borderBottom: `1px solid ${COLORS.borderDefault}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 style={{ margin: 0, color: COLORS.textPrimary }}>ADD NEW VIDEO TO {addModal.topic?.name || 'TOPIC'}</h3>
+              <button onClick={closeAddModal} style={{ background: 'none', border: 'none', color: COLORS.textSecondary, fontSize: '20px', cursor: 'pointer' }}>×</button>
             </div>
             
             <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px', maxHeight: '70vh', overflowY: 'auto' }}>
               <div>
-                <label style={{ fontSize: '12px', color: '#888', marginBottom: '6px', display: 'block' }}>Title</label>
+                <label style={{ fontSize: '12px', color: COLORS.textSecondary, marginBottom: '6px', display: 'block' }}>Title</label>
                 <input
                   style={inputStyle}
                   value={addForm.title}
@@ -564,14 +622,14 @@ function Planner() {
                     if (addErrors.title) setAddErrors((p) => ({ ...p, title: '' }))
                   }}
                 />
-                <div style={{ fontSize: '12px', color: addForm.title.length >= 100 ? '#ef4444' : '#888', marginTop: '4px' }}>
+                <div style={{ fontSize: '12px', color: addForm.title.length >= 100 ? COLORS.textError : COLORS.textSecondary, marginTop: '4px' }}>
                   {addForm.title.length}/100
                 </div>
-                {addErrors.title ? <div style={{ color: '#ef4444', fontSize: '12px', marginTop: '6px' }}>{addErrors.title}</div> : null}
+                {addErrors.title ? <div style={{ color: COLORS.textError, fontSize: '12px', marginTop: '6px' }}>{addErrors.title}</div> : null}
               </div>
 
               <div>
-                <label style={{ fontSize: '12px', color: '#888', marginBottom: '6px', display: 'block' }}>Description</label>
+                <label style={{ fontSize: '12px', color: COLORS.textSecondary, marginBottom: '6px', display: 'block' }}>Description</label>
                 <textarea
                   style={{ ...textareaStyle, minHeight: '100px', resize: 'none' }}
                   value={addForm.description}
@@ -581,7 +639,7 @@ function Planner() {
                   }}
                 />
                 {addErrors.description ? (
-                  <div style={{ color: '#ef4444', fontSize: '12px', marginTop: '6px' }}>{addErrors.description}</div>
+                  <div style={{ color: COLORS.textError, fontSize: '12px', marginTop: '6px' }}>{addErrors.description}</div>
                 ) : null}
               </div>
 
@@ -622,10 +680,10 @@ function Planner() {
               </div>
             </div>
 
-            <div style={{ padding: '16px', borderTop: '1px solid #333', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
-              <button type="button" onClick={addPlannerVideo} style={{ padding: '12px 24px', backgroundColor: '#22c55e', color: '#000', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>Add</button>
-              <button type="button" onClick={() => navigate('/scheduler')} style={{ padding: '12px 24px', backgroundColor: '#fff', color: '#000', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>Schedule</button>
-              <button type="button" onClick={closeAddModal} style={{ padding: '12px 24px', backgroundColor: '#ef4444', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>Delete</button>
+            <div style={{ padding: '16px', borderTop: `1px solid ${COLORS.borderDefault}`, display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+              <button type="button" onClick={addPlannerVideo} style={{ padding: '12px 24px', backgroundColor: COLORS.buttonBgSuccess, color: COLORS.buttonTextPrimary, border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>Add</button>
+              <button type="button" onClick={() => navigate('/scheduler')} style={{ padding: '12px 24px', backgroundColor: COLORS.textPrimary, color: COLORS.buttonTextPrimary, border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>Schedule</button>
+              <button type="button" onClick={closeAddModal} style={{ padding: '12px 24px', backgroundColor: COLORS.buttonBgDanger, color: COLORS.textPrimary, border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>Delete</button>
             </div>
           </div>
         </div>
@@ -650,8 +708,8 @@ function Planner() {
           <div
             style={{
               width: 'min(520px, 100%)',
-              backgroundColor: '#101010',
-              border: '1px solid #333',
+              backgroundColor: COLORS.bgModal,
+              border: `1px solid ${COLORS.borderDefault}`,
               borderRadius: '16px',
               overflow: 'hidden',
               boxShadow: '0 24px 80px rgba(0,0,0,0.55)',
@@ -660,8 +718,8 @@ function Planner() {
             <div
               style={{
                 padding: '16px',
-                borderBottom: '1px solid #333',
-                background: 'linear-gradient(180deg, rgba(239,68,68,0.14), rgba(0,0,0,0))',
+                borderBottom: `1px solid ${COLORS.borderDefault}`,
+                background: `linear-gradient(180deg, rgba(239,68,68,0.14), rgba(0,0,0,0))`,
               }}
             >
               <div style={{ fontWeight: 950, fontSize: '16px' }}>Are you sure?</div>
@@ -670,7 +728,7 @@ function Planner() {
               </div>
             </div>
 
-            <div style={{ padding: '14px 16px', display: 'flex', justifyContent: 'flex-end', gap: '10px', borderTop: '1px solid #333' }}>
+            <div style={{ padding: '14px 16px', display: 'flex', justifyContent: 'flex-end', gap: '10px', borderTop: `1px solid ${COLORS.borderDefault}` }}>
               <button
                 type="button"
                 style={btnStyle}
@@ -709,16 +767,16 @@ function Planner() {
 
       {viewModal.open && viewModal.video ? (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '18px', zIndex: 50 }}>
-          <div style={{ width: 'min(800px, 100%)', backgroundColor: '#101010', border: '1px solid #333', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 24px 80px rgba(0,0,0,0.55)' }}>
-            <div style={{ padding: '16px', borderBottom: '1px solid #333', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h3 style={{ margin: 0, color: '#fff', wordBreak: 'break-word' }}>{viewModal.video.video_title || 'Untitled'}</h3>
-              <button onClick={() => setViewModal({ open: false, topicId: null, video: null })} style={{ background: 'none', border: 'none', color: '#888', fontSize: '20px', cursor: 'pointer' }}>×</button>
+          <div style={{ width: 'min(800px, 100%)', backgroundColor: COLORS.bgModal, border: `1px solid ${COLORS.borderDefault}`, borderRadius: '16px', overflow: 'hidden', boxShadow: '0 24px 80px rgba(0,0,0,0.55)' }}>
+            <div style={{ padding: '16px', borderBottom: `1px solid ${COLORS.borderDefault}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 style={{ margin: 0, color: COLORS.textPrimary, wordBreak: 'break-word' }}>{viewModal.video.video_title || 'Untitled'}</h3>
+              <button onClick={() => setViewModal({ open: false, topicId: null, video: null })} style={{ background: 'none', border: 'none', color: COLORS.textSecondary, fontSize: '20px', cursor: 'pointer' }}>×</button>
             </div>
             <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px', maxHeight: '70vh', overflowY: 'auto' }}>
               <div>
-                <label style={{ fontSize: '12px', color: '#888', marginBottom: '6px', display: 'block' }}>Title</label>
+                <label style={{ fontSize: '12px', color: COLORS.textSecondary, marginBottom: '6px', display: 'block' }}>Title</label>
                 <textarea
-                  style={{ width: '100%', padding: '10px', border: '1px solid #333', backgroundColor: '#1a1a1a', color: 'white', borderRadius: '8px', boxSizing: 'border-box', minHeight: '50px', overflow: 'hidden', fontFamily: 'sans-serif', resize: 'none' }}
+                  style={{ width: '100%', padding: '10px', border: `1px solid ${COLORS.borderDefault}`, backgroundColor: COLORS.bgCard, color: COLORS.textPrimary, borderRadius: '8px', boxSizing: 'border-box', minHeight: '50px', overflow: 'hidden', fontFamily: 'sans-serif', resize: 'none' }}
                   value={viewModal.video.video_title || ''}
                   maxLength="100"
                   onFocus={(e) => autoExpandTextarea(e)}
@@ -727,14 +785,14 @@ function Planner() {
                     autoExpandTextarea(e)
                   }}
                 />
-                <div style={{ fontSize: '12px', color: (viewModal.video.video_title || '').length >= 100 ? '#ef4444' : '#888', marginTop: '4px' }}>
+                <div style={{ fontSize: '12px', color: (viewModal.video.video_title || '').length >= 100 ? COLORS.textError : COLORS.textSecondary, marginTop: '4px' }}>
                   {(viewModal.video.video_title || '').length}/100 - Title limit
                 </div>
               </div>
               <div>
-                <label style={{ fontSize: '12px', color: '#888', marginBottom: '6px', display: 'block' }}>Description</label>
+                <label style={{ fontSize: '12px', color: COLORS.textSecondary, marginBottom: '6px', display: 'block' }}>Description</label>
                 <textarea
-                  style={{ width: '100%', padding: '10px', border: '1px solid #333', backgroundColor: '#1a1a1a', color: 'white', borderRadius: '8px', boxSizing: 'border-box', minHeight: '100px', overflow: 'hidden', fontFamily: 'sans-serif', resize: 'none' }}
+                  style={{ width: '100%', padding: '10px', border: `1px solid ${COLORS.borderDefault}`, backgroundColor: COLORS.bgCard, color: COLORS.textPrimary, borderRadius: '8px', boxSizing: 'border-box', minHeight: '100px', overflow: 'hidden', fontFamily: 'sans-serif', resize: 'none' }}
                   value={viewModal.video.video_description || ''}
                   maxLength="5000"
                   onFocus={(e) => autoExpandTextarea(e)}
@@ -745,20 +803,20 @@ function Planner() {
                 />
               </div>
               <div>
-                <label style={{ fontSize: '12px', color: '#888', marginBottom: '6px', display: 'block' }}>Binded Videos</label>
+                <label style={{ fontSize: '12px', color: COLORS.textSecondary, marginBottom: '6px', display: 'block' }}>Binded Videos</label>
                 <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', padding: '10px 0' }}>
                   {(Array.isArray(viewModal.video.binded_videos) ? viewModal.video.binded_videos : []).map((b, idx) => (
                     <div key={idx} style={{ position: 'relative', display: 'inline-block' }}>
-                      <img src={b.thumbnail || ''} alt="" style={{ width: '80px', height: '80px', borderRadius: '8px', border: '1px solid #333', cursor: 'pointer', objectFit: 'cover' }} onClick={() => { const url = b.video_link || (b.video_id ? `https://www.youtube.com/watch?v=${b.video_id}` : ''); if (url) window.open(url, '_blank') }} />
-                      <button onClick={() => { const updated = viewModal.video.binded_videos.filter((_, i) => i !== idx); setViewModal(p => ({ ...p, video: { ...p.video, binded_videos: updated } })); if (viewModal.video.id) { patchCardLocal(viewModal.topicId, viewModal.video.id, { binded_videos: updated }); supabase.from('planner_videos').update({ binded_videos: updated }).eq('id', viewModal.video.id).then() } }} style={{ position: 'absolute', top: '-8px', right: '-8px', width: '22px', height: '22px', borderRadius: '50%', backgroundColor: '#ef4444', color: 'white', border: '2px solid #101010', cursor: 'pointer', fontWeight: 'bold', fontSize: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.5)' }}>×</button>
+                      <img src={b.thumbnail || ''} alt="" style={{ width: '80px', height: '80px', borderRadius: '8px', border: `1px solid ${COLORS.borderDefault}`, cursor: 'pointer', objectFit: 'cover' }} onClick={() => { const url = b.video_link || (b.video_id ? `https://www.youtube.com/watch?v=${b.video_id}` : ''); if (url) window.open(url, '_blank') }} />
+                      <button onClick={() => { const updated = viewModal.video.binded_videos.filter((_, i) => i !== idx); setViewModal(p => ({ ...p, video: { ...p.video, binded_videos: updated } })); if (viewModal.video.id) { patchCardLocal(viewModal.topicId, viewModal.video.id, { binded_videos: updated }); supabase.from('planner_videos').update({ binded_videos: updated }).eq('id', viewModal.video.id).then() } }} style={{ position: 'absolute', top: '-8px', right: '-8px', width: '22px', height: '22px', borderRadius: '50%', backgroundColor: COLORS.buttonBgDanger, color: COLORS.textPrimary, border: `2px solid ${COLORS.bgModal}`, cursor: 'pointer', fontWeight: 'bold', fontSize: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.5)' }}>×</button>
                     </div>
                   ))}
                 </div>
               </div>
               <div>
-                <label style={{ fontSize: '12px', color: '#888', marginBottom: '6px', display: 'block' }}>Notes</label>
+                <label style={{ fontSize: '12px', color: COLORS.textSecondary, marginBottom: '6px', display: 'block' }}>Notes</label>
                 <textarea
-                  style={{ width: '100%', padding: '10px', border: '1px solid #333', backgroundColor: '#1a1a1a', color: 'white', borderRadius: '8px', boxSizing: 'border-box', minHeight: '80px', overflow: 'hidden', fontFamily: 'sans-serif', resize: 'none' }}
+                  style={{ width: '100%', padding: '10px', border: `1px solid ${COLORS.borderDefault}`, backgroundColor: COLORS.bgCard, color: COLORS.textPrimary, borderRadius: '8px', boxSizing: 'border-box', minHeight: '80px', overflow: 'hidden', fontFamily: 'sans-serif', resize: 'none' }}
                   value={viewModal.video.notes || ''}
                   maxLength="5000"
                   onFocus={(e) => autoExpandTextarea(e)}
@@ -769,7 +827,7 @@ function Planner() {
                 />
               </div>
             </div>
-            <div style={{ padding: '16px', borderTop: '1px solid #333', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+            <div style={{ padding: '16px', borderTop: `1px solid ${COLORS.borderDefault}`, display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
               <button
                 onClick={() => {
                   if (viewModal.video.id) {
@@ -785,11 +843,11 @@ function Planner() {
                       })
                   }
                 }}
-                style={{ padding: '12px 24px', backgroundColor: '#22c55e', color: '#000', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>
+                style={{ padding: '12px 24px', backgroundColor: COLORS.buttonBgSuccess, color: COLORS.buttonTextPrimary, border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>
                 Save
               </button>
-              <button onClick={() => navigate('/scheduler')} style={{ padding: '12px 24px', backgroundColor: '#fff', color: '#000', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>Schedule</button>
-              <button onClick={() => { supabase.from('planner_videos').delete().eq('id', viewModal.video.id).then(() => { setViewModal({ open: false, topicId: null, video: null }); setByTopic(p => ({ ...p, [viewModal.topicId]: (p[viewModal.topicId] || []).filter(v => v.id !== viewModal.video.id) })) }) }} style={{ padding: '12px 24px', backgroundColor: '#ef4444', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>Delete</button>
+              <button onClick={() => navigate('/scheduler')} style={{ padding: '12px 24px', backgroundColor: COLORS.textPrimary, color: COLORS.buttonTextPrimary, border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>Schedule</button>
+              <button onClick={() => { supabase.from('planner_videos').delete().eq('id', viewModal.video.id).then(() => { setViewModal({ open: false, topicId: null, video: null }); setByTopic(p => ({ ...p, [viewModal.topicId]: (p[viewModal.topicId] || []).filter(v => v.id !== viewModal.video.id) })) }) }} style={{ padding: '12px 24px', backgroundColor: COLORS.buttonBgDanger, color: COLORS.textPrimary, border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>Delete</button>
             </div>
           </div>
         </div>
