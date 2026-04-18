@@ -13,6 +13,20 @@ const COLORS = {
   buttonBg: '#222222',
 };
 
+// Convert any date to local YYYY-MM-DD string (ignore timezone)
+const getLocalDateString = (date) => {
+  const d = new Date(date);
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${d.getFullYear()}-${month}-${day}`;
+};
+
+// Convert YYYY-MM-DD string back to Date object at local midnight
+const dateStringToDate = (dateStr) => {
+  const [year, month, day] = dateStr.split('-').map(Number);
+  return new Date(year, month - 1, day, 0, 0, 0, 0);
+};
+
 const TOPIC_COLORS = ['#ef4444', '#22c55e', '#3b82f6'];
 
 const Scheduler = () => {
@@ -47,7 +61,15 @@ const Scheduler = () => {
         .eq('status', 'scheduled');
 
       if (videosError) throw videosError;
-      setVideos(videosData || []);
+      
+      const normalizedVideos = (videosData || []).map(video => ({
+        ...video,
+        created_at: video.created_at && !video.created_at.includes('Z') 
+          ? `${video.created_at}Z` 
+          : video.created_at
+      }));
+
+      setVideos(normalizedVideos);
     } catch (err) {
       console.error('Error fetching data:', err);
     } finally {
@@ -93,7 +115,7 @@ const Scheduler = () => {
     setActiveFilters(next);
   };
 
-  const handleDeleteSuccess = (deletedId) => {
+  const onDeleteSuccess = (deletedId) => {
     setVideos(prev => prev.filter(v => v.id !== deletedId));
   };
 
@@ -101,30 +123,31 @@ const Scheduler = () => {
     const video = videos.find(v => v.id === videoId);
     if (!video) return;
 
-    const originalDate = video.created_at;
-    const newDate = new Date(newDateStr).toDateString();
+    const originalDateStr = getLocalDateString(video.created_at);
+    if (originalDateStr === newDateStr) return;
 
-    if (new Date(originalDate).toDateString() === newDate) {
-      return; // Do nothing if dropped on the same date
-    }
+    // Create target Date object at local midnight for DB
+    const targetDateObj = dateStringToDate(newDateStr);
+    const targetISO = targetDateObj.toISOString();
 
     // Local update for immediate UI response
-    setVideos(prev => prev.map(v => v.id === videoId ? { ...v, created_at: new Date(newDateStr).toISOString() } : v));
+    const originalISOValue = video.created_at;
+    setVideos(prev => prev.map(v => v.id === videoId ? { ...v, created_at: targetISO } : v));
 
     try {
       const { error } = await supabase
         .from('planner_videos')
-        .update({ created_at: new Date(newDateStr).toISOString() })
+        .update({ created_at: targetISO })
         .eq('id', videoId);
 
       if (error) throw error;
 
-      setToast({ text: `✅ Video moved to ${new Date(newDateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`, kind: 'success' });
+      setToast({ text: `✅ Video moved to ${newDateStr}`, kind: 'success' });
       setTimeout(() => setToast(null), 3000);
     } catch (err) {
       console.error('Drag error:', err);
       // Revert if error
-      setVideos(prev => prev.map(v => v.id === videoId ? { ...v, created_at: originalDate } : v));
+      setVideos(prev => prev.map(v => v.id === videoId ? { ...v, created_at: originalISOValue } : v));
       setToast({ text: 'Failed to move video.', kind: 'error' });
       setTimeout(() => setToast(null), 3000);
     }
@@ -286,7 +309,11 @@ const Scheduler = () => {
             setShowModal(false);
             setSelectedVideo(null);
           }}
-          onDeleteSuccess={handleDeleteSuccess}
+          onDeleteSuccess={onDeleteSuccess}
+          onUpdateSuccess={(updatedVideo) => {
+            setVideos(prev => prev.map(v => v.id === updatedVideo.id ? updatedVideo : v));
+            setSelectedVideo(updatedVideo);
+          }}
         />
       )}
 

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
   DndContext, 
   useDraggable, 
@@ -12,7 +12,7 @@ import {
 
 const COLORS = {
   bgCell: '#0f0f0f',
-  bgCellActive: '#1a1a1a',
+  bgCellActive: '#1a1212',
   bgCellOther: '#0a0a0a',
   border: '#333333',
   textPrimary: '#ffffff',
@@ -20,6 +20,31 @@ const COLORS = {
   textMuted: '#444444',
   videoCardBg: '#1a1a1a',
   videoCardHover: '#252525',
+};
+
+// --- Utility Functions ---
+
+// Convert any date to local YYYY-MM-DD string (ignore timezone)
+const getLocalDateString = (date) => {
+  const d = new Date(date);
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${d.getFullYear()}-${month}-${day}`;
+};
+
+// Convert YYYY-MM-DD string back to Date object at local midnight
+const dateStringToDate = (dateStr) => {
+  const [year, month, day] = dateStr.split('-').map(Number);
+  return new Date(year, month - 1, day, 0, 0, 0, 0);
+};
+
+// Get start of week (Monday) for any date
+const getMonday = (date) => {
+  const d = new Date(date);
+  const day = d.getDay();
+  // Adjust for Monday start (Monday=1...Sunday=0)
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+  return new Date(d.setDate(diff));
 };
 
 const internalScrollbarStyle = `
@@ -31,6 +56,8 @@ const internalScrollbarStyle = `
     scrollbar-width: none;
   }
 `;
+
+// --- Components ---
 
 const DraggableVideoCard = ({ video, color, onVideoClick, isOverlay }) => {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
@@ -47,7 +74,7 @@ const DraggableVideoCard = ({ video, color, onVideoClick, isOverlay }) => {
 
   const style = {
     transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
-    opacity: isDragging && !isOverlay ? 0 : 1, // Hide original while dragging
+    opacity: isDragging && !isOverlay ? 0 : 1,
     backgroundColor: color,
     padding: '6px 8px',
     borderRadius: '4px',
@@ -90,12 +117,13 @@ const DraggableVideoCard = ({ video, color, onVideoClick, isOverlay }) => {
   );
 };
 
-const DroppableDayCell = ({ dayObj, isToday, isCurrentMonth, idx, videos, topicColors, onVideoClick }) => {
-  const dateKey = dayObj.date.toDateString();
+const DroppableDayCell = ({ day, topicColors, onVideoClick }) => {
   const { isOver, setNodeRef } = useDroppable({
-    id: `day-${dateKey}`,
-    data: { date: dayObj.date }
+    id: `day-${day.dateStr}`,
+    data: { dateStr: day.dateStr }
   });
+
+  const isToday = getLocalDateString(new Date()) === day.dateStr;
 
   const cellStyle = {
     border: `1px solid ${COLORS.border}`,
@@ -103,9 +131,10 @@ const DroppableDayCell = ({ dayObj, isToday, isCurrentMonth, idx, videos, topicC
     display: 'flex',
     flexDirection: 'column',
     gap: '2px',
-    backgroundColor: isCurrentMonth 
-      ? (isOver ? 'rgba(239, 68, 68, 0.1)' : COLORS.bgCell) 
+    backgroundColor: day.isCurrentMonth 
+      ? (isOver ? COLORS.bgCellActive : COLORS.bgCell) 
       : COLORS.bgCellOther,
+    opacity: day.isCurrentMonth ? 1 : 0.5,
     minHeight: 0,
     height: '120px',
     overflow: 'hidden',
@@ -121,14 +150,14 @@ const DroppableDayCell = ({ dayObj, isToday, isCurrentMonth, idx, videos, topicC
       <div style={{
         fontSize: '11px',
         fontWeight: isToday ? 'bold' : 'normal',
-        color: isCurrentMonth ? (isToday ? '#ef4444' : COLORS.textPrimary) : COLORS.textMuted,
+        color: day.isCurrentMonth ? (isToday ? '#ef4444' : COLORS.textPrimary) : COLORS.textMuted,
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
         marginBottom: '2px',
         flexShrink: 0
       }}>
-        <span>{dayObj.day}</span>
+        <span>{day.dateNum}</span>
         {isToday && <span style={{ fontSize: '9px', backgroundColor: '#ef4444', color: '#fff', padding: '0px 3px', borderRadius: '3px' }}>TODAY</span>}
       </div>
 
@@ -140,10 +169,10 @@ const DroppableDayCell = ({ dayObj, isToday, isCurrentMonth, idx, videos, topicC
           gap: '3px', 
           overflowY: 'auto', 
           flex: 1,
-          paddingBottom: videos.length > 2 ? '16px' : '0' 
+          paddingBottom: day.videos.length > 2 ? '16px' : '0' 
         }}
       >
-        {videos.map(video => (
+        {day.videos.map(video => (
           <DraggableVideoCard 
             key={video.id} 
             video={video} 
@@ -153,7 +182,7 @@ const DroppableDayCell = ({ dayObj, isToday, isCurrentMonth, idx, videos, topicC
         ))}
       </div>
 
-      {videos.length > 2 && (
+      {day.videos.length > 2 && (
         <div style={{ 
           position: 'absolute',
           bottom: '2px',
@@ -166,48 +195,59 @@ const DroppableDayCell = ({ dayObj, isToday, isCurrentMonth, idx, videos, topicC
           padding: '1px 3px',
           borderRadius: '2px'
         }}>
-          + {videos.length - 2} more
+          + {day.videos.length - 2} more
         </div>
       )}
     </div>
   );
 };
 
+// --- Main Calendar ---
+
 const SchedulerCalendar = ({ currentMonth, videos, topicColors, onVideoClick, onMoveVideo }) => {
   const [activeVideo, setActiveVideo] = useState(null);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
 
-  const startOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
-  const endOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0);
-  let startDay = startOfMonth.getDay(); 
-  startDay = startDay === 0 ? 6 : startDay - 1;
+  const videosByDate = useMemo(() => {
+    const grouped = {};
+    videos.forEach(video => {
+      const dateStr = getLocalDateString(video.created_at);
+      if (!grouped[dateStr]) grouped[dateStr] = [];
+      grouped[dateStr].push(video);
+    });
+    return grouped;
+  }, [videos]);
 
-  const prevMonthEnd = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 0).getDate();
-  const daysInMonth = endOfMonth.getDate();
-
-  const videosByDate = videos.reduce((acc, video) => {
-    const dateKey = new Date(video.created_at).toDateString();
-    if (!acc[dateKey]) acc[dateKey] = [];
-    acc[dateKey].push(video);
-    return acc;
-  }, {});
-
-  const daysArr = [];
-  for (let i = startDay - 1; i >= 0; i--) {
-    daysArr.push({ day: prevMonthEnd - i, month: 'prev', date: new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, prevMonthEnd - i) });
-  }
-  for (let i = 1; i <= daysInMonth; i++) {
-    daysArr.push({ day: i, month: 'current', date: new Date(currentMonth.getFullYear(), currentMonth.getMonth(), i) });
-  }
-  const totalCells = 42; 
-  const remainingCells = totalCells - daysArr.length;
-  for (let i = 1; i <= remainingCells; i++) {
-    daysArr.push({ day: i, month: 'next', date: new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, i) });
-  }
+  const calendarGrid = useMemo(() => {
+    const year = currentMonth.getFullYear();
+    const month = currentMonth.getMonth();
+    
+    const firstDayOfMonth = new Date(year, month, 1);
+    const firstMonday = getMonday(firstDayOfMonth);
+    
+    const weeks = [];
+    let currentDate = new Date(firstMonday);
+    
+    // Always build 6 weeks for a consistent grid
+    for (let w = 0; w < 6; w++) {
+      for (let d = 0; d < 7; d++) {
+        const dateStr = getLocalDateString(currentDate);
+        weeks.push({
+          dateStr,
+          dateNum: currentDate.getDate(),
+          isCurrentMonth: currentDate.getMonth() === month,
+          videos: videosByDate[dateStr] || []
+        });
+        currentDate.setDate(currentDate.getDate() + 1);
+      }
+    }
+    return weeks;
+  }, [currentMonth, videosByDate]);
 
   const handleDragStart = (event) => {
     const { active } = event;
-    const video = videos.find(v => `video-${v.id}` === active.id);
+    const videoId = active.id.replace('video-', '');
+    const video = videos.find(v => v.id === videoId);
     setActiveVideo(video);
   };
 
@@ -220,17 +260,7 @@ const SchedulerCalendar = ({ currentMonth, videos, topicColors, onVideoClick, on
     setActiveVideo(null);
   };
 
-  const dayOfWeek = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-
-  const dropAnimation = {
-    sideEffects: defaultDropAnimationSideEffects({
-      styles: {
-        active: {
-          opacity: '0.5',
-        },
-      },
-    }),
-  };
+  const dayOfWeek = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
 
   return (
     <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
@@ -245,6 +275,8 @@ const SchedulerCalendar = ({ currentMonth, videos, topicColors, onVideoClick, on
         overflow: 'hidden',
       }}>
         <style>{internalScrollbarStyle}</style>
+        
+        {/* Header Grid */}
         <div style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(7, 1fr)',
@@ -252,7 +284,7 @@ const SchedulerCalendar = ({ currentMonth, videos, topicColors, onVideoClick, on
         }}>
           {dayOfWeek.map(d => (
             <div key={d} style={{ 
-              padding: '8px', 
+              padding: '12px 8px', 
               textAlign: 'center', 
               fontSize: '11px', 
               fontWeight: 'bold', 
@@ -264,6 +296,8 @@ const SchedulerCalendar = ({ currentMonth, videos, topicColors, onVideoClick, on
             }}>{d}</div>
           ))}
         </div>
+
+        {/* Calendar Body */}
         <div style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(7, 1fr)',
@@ -271,26 +305,18 @@ const SchedulerCalendar = ({ currentMonth, videos, topicColors, onVideoClick, on
           flex: 1,
           minHeight: 0,
         }}>
-          {daysArr.map((dayObj, idx) => {
-            const dateKey = dayObj.date.toDateString();
-            const dayVideos = videosByDate[dateKey] || [];
-            return (
-              <DroppableDayCell 
-                key={idx}
-                dayObj={dayObj}
-                isToday={new Date().toDateString() === dateKey}
-                isCurrentMonth={dayObj.month === 'current'}
-                idx={idx}
-                videos={dayVideos}
-                topicColors={topicColors}
-                onVideoClick={onVideoClick}
-              />
-            );
-          })}
+          {calendarGrid.map((day, idx) => (
+            <DroppableDayCell 
+              key={idx}
+              day={day}
+              topicColors={topicColors}
+              onVideoClick={onVideoClick}
+            />
+          ))}
         </div>
       </div>
 
-      <DragOverlay dropAnimation={dropAnimation}>
+      <DragOverlay dropAnimation={null}>
         {activeVideo ? (
           <DraggableVideoCard 
             video={activeVideo} 

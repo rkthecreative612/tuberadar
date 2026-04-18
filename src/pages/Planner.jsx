@@ -202,10 +202,17 @@ function Planner() {
             .from('planner_videos')
             .select('*')
             .eq('topic_id', t.id)
-            .eq('status', 'planning')
             .order('position', { ascending: true })
             .order('created_at', { ascending: true })
-          return [t.id, data || []]
+          
+          const normalized = (data || []).map(video => ({
+            ...video,
+            created_at: video.created_at && !video.created_at.includes('Z') 
+              ? `${video.created_at}Z` 
+              : video.created_at
+          }));
+
+          return [t.id, normalized]
         }),
       )
 
