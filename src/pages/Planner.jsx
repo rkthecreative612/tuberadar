@@ -11,8 +11,29 @@ function chunk(arr, size) {
   return out
 }
 
+const scrollbarStyles = `
+  ::-webkit-scrollbar {
+    width: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #444;
+    border-radius: 4px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #555;
+  }
+`;
+
 function Planner() {
   const navigate = useNavigate()
+
+  const autoExpandTextarea = (e) => {
+    e.target.style.height = 'auto'
+    e.target.style.height = Math.min(e.target.scrollHeight, 300) + 'px'
+  }
   const [topics, setTopics] = useState([])
   const [byTopic, setByTopic] = useState({})
   const [expandedCardId, setExpandedCardId] = useState(null)
@@ -62,10 +83,11 @@ function Planner() {
 
   async function addPlannerVideo() {
     const title = addForm.title.trim()
+    const description = addForm.description.trim()
 
     const next = {
       title: title ? '' : 'Title is required',
-      description: addForm.description.trim() ? '' : 'Description is required',
+      description: description ? '' : 'Description is required',
     }
     setAddErrors(next)
     if (next.title || next.description) return
@@ -96,11 +118,9 @@ function Planner() {
       })
 
     const payload = {
-      brainstorm_id: null,
       topic_id: topic.id,
       video_title: title,
-      video_description: addForm.description.trim(),
-      video_link: '',
+      video_description: description,
       binded_videos: binded,
       notes: addForm.notes.trim(),
       position: nextPosition,
@@ -109,6 +129,7 @@ function Planner() {
     const { data, error } = await supabase.from('planner_videos').insert(payload).select('*').single()
     if (error) {
       console.log(error)
+      alert('Failed to add video: ' + error.message)
       return
     }
 
@@ -116,7 +137,9 @@ function Planner() {
       ...prev,
       [topic.id]: [...(prev[topic.id] || []), data],
     }))
+
     closeAddModal()
+    alert('✅ Video added to Planner')
   }
 
   useEffect(() => {
@@ -247,7 +270,7 @@ function Planner() {
 
   const thumbStyle = {
     width: '100%',
-    height: '150px',
+    height: '120px',
     objectFit: 'cover',
     backgroundColor: '#0f0f0f',
   }
@@ -291,24 +314,28 @@ function Planner() {
 
   const actionsStyle = {
     display: 'flex',
-    gap: '12px',
+    gap: '8px',
     flexWrap: 'wrap',
-    justifyContent: 'center',
-    marginTop: '12px',
+    justifyContent: 'space-between',
+    marginTop: '8px',
+    width: '100%',
   }
 
   const btnStyle = {
-    padding: '12px 20px',
-    borderRadius: '10px',
+    padding: '8px 16px',
+    borderRadius: '6px',
     border: '1px solid #333',
     backgroundColor: '#fff',
     color: '#000',
     cursor: 'pointer',
-    fontWeight: 750,
-    fontSize: '13px',
+    fontWeight: 700,
+    fontSize: '12px',
+    transition: 'all 0.2s',
+    flex: '1',
+    minWidth: '80px',
   }
 
-  const btnPrimaryStyle = { ...btnStyle }
+  const btnPrimaryStyle = { ...btnStyle, backgroundColor: '#1a1a1a', color: '#fff', border: '1px solid #555' }
   const btnDangerStyle = { ...btnStyle, backgroundColor: '#ef4444', border: '1px solid #ef4444', color: '#fff' }
 
   const emptyStyle = {
@@ -429,7 +456,9 @@ function Planner() {
 
   return (
     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+      <style>{scrollbarStyles}</style>
       <div className="plannerPage" style={pageStyle}>
+        <div style={{ padding: '0 22px 16px 22px', fontSize: '28px', fontWeight: 'bold', color: 'white' }}>Content Planner</div>
         <div className="plannerGrid" style={gridStyle}>
           {topicRows.map((row) => (
             <div key={row.map((t) => t.id).join('-')} className="plannerRow" style={rowStyle}>
@@ -515,70 +544,36 @@ function Planner() {
           ))}
         </div>
       </div>
-
       {addModal.open ? (
-        <div
-          onMouseDown={(e) => {
-            if (e.target === e.currentTarget) closeAddModal()
-          }}
-          style={{
-            position: 'fixed',
-            inset: 0,
-            backgroundColor: 'rgba(0,0,0,0.65)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '18px',
-            zIndex: 50,
-          }}
-        >
-          <div
-            style={{
-              width: 'min(720px, 100%)',
-              backgroundColor: '#101010',
-              border: '1px solid #333',
-              borderRadius: '16px',
-              overflow: 'hidden',
-              boxShadow: '0 24px 80px rgba(0,0,0,0.55)',
-            }}
-          >
-            <div
-              style={{
-                padding: '14px 16px',
-                borderBottom: '1px solid #333',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                gap: '12px',
-                background: 'linear-gradient(180deg, rgba(225,6,0,0.12), rgba(0,0,0,0))',
-              }}
-            >
-              <div style={{ fontWeight: 900, letterSpacing: '0.02em' }}>
-                ADD NEW VIDEO TO {addModal.topic?.name || 'TOPIC'}
-              </div>
-              <button type="button" onClick={closeAddModal} style={btnStyle}>
-                Cancel
-              </button>
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '18px', zIndex: 50 }}>
+          <div style={{ width: 'min(800px, 100%)', backgroundColor: '#101010', border: '1px solid #333', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 24px 80px rgba(0,0,0,0.55)' }}>
+            <div style={{ padding: '16px', borderBottom: '1px solid #333', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 style={{ margin: 0, color: '#fff' }}>ADD NEW VIDEO TO {addModal.topic?.name || 'TOPIC'}</h3>
+              <button onClick={closeAddModal} style={{ background: 'none', border: 'none', color: '#888', fontSize: '20px', cursor: 'pointer' }}>×</button>
             </div>
-
-            <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            
+            <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px', maxHeight: '70vh', overflowY: 'auto' }}>
               <div>
-                <div style={fieldLabelStyle}>Title:</div>
+                <label style={{ fontSize: '12px', color: '#888', marginBottom: '6px', display: 'block' }}>Title</label>
                 <input
                   style={inputStyle}
                   value={addForm.title}
+                  maxLength="100"
                   onChange={(e) => {
                     setAddForm((p) => ({ ...p, title: e.target.value }))
                     if (addErrors.title) setAddErrors((p) => ({ ...p, title: '' }))
                   }}
                 />
+                <div style={{ fontSize: '12px', color: addForm.title.length >= 100 ? '#ef4444' : '#888', marginTop: '4px' }}>
+                  {addForm.title.length}/100
+                </div>
                 {addErrors.title ? <div style={{ color: '#ef4444', fontSize: '12px', marginTop: '6px' }}>{addErrors.title}</div> : null}
               </div>
 
               <div>
-                <div style={fieldLabelStyle}>Description:</div>
+                <label style={{ fontSize: '12px', color: '#888', marginBottom: '6px', display: 'block' }}>Description</label>
                 <textarea
-                  style={textareaStyle}
+                  style={{ ...textareaStyle, minHeight: '100px', resize: 'none' }}
                   value={addForm.description}
                   onChange={(e) => {
                     setAddForm((p) => ({ ...p, description: e.target.value }))
@@ -591,7 +586,7 @@ function Planner() {
               </div>
 
               <div>
-                <div style={fieldLabelStyle}>Binded Videos (optional):</div>
+                <label style={{ fontSize: '12px', color: '#888', marginBottom: '6px', display: 'block' }}>Binded Videos (optional)</label>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   {addForm.bindedLinks.map((v, idx) => (
                     <input
@@ -609,7 +604,7 @@ function Planner() {
                   ))}
                   <button
                     type="button"
-                    style={btnStyle}
+                    style={{ ...btnStyle, alignSelf: 'flex-start' }}
                     onClick={() => setAddForm((p) => ({ ...p, bindedLinks: [...p.bindedLinks, ''] }))}
                   >
                     Add video link +
@@ -618,34 +613,23 @@ function Planner() {
               </div>
 
               <div>
-                <div style={fieldLabelStyle}>Notes:</div>
+                <label style={{ fontSize: '12px', color: '#888', marginBottom: '6px', display: 'block' }}>Notes</label>
                 <textarea
-                  style={textareaStyle}
+                  style={{ ...textareaStyle, minHeight: '80px', resize: 'none' }}
                   value={addForm.notes}
                   onChange={(e) => setAddForm((p) => ({ ...p, notes: e.target.value }))}
                 />
               </div>
             </div>
 
-            <div
-              style={{
-                padding: '14px 16px',
-                borderTop: '1px solid #333',
-                display: 'flex',
-                justifyContent: 'flex-end',
-                gap: '10px',
-              }}
-            >
-              <button type="button" style={btnStyle} onClick={closeAddModal}>
-                Cancel
-              </button>
-              <button type="button" style={btnPrimaryStyle} onClick={addPlannerVideo}>
-                Add
-              </button>
+            <div style={{ padding: '16px', borderTop: '1px solid #333', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+              <button type="button" onClick={addPlannerVideo} style={{ padding: '12px 24px', backgroundColor: '#22c55e', color: '#000', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>Add</button>
+              <button type="button" onClick={() => navigate('/scheduler')} style={{ padding: '12px 24px', backgroundColor: '#fff', color: '#000', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>Schedule</button>
+              <button type="button" onClick={closeAddModal} style={{ padding: '12px 24px', backgroundColor: '#ef4444', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>Delete</button>
             </div>
           </div>
         </div>
-      ) : null}
+      ) : null}l}
 
       {deleteModal.open ? (
         <div
@@ -724,37 +708,88 @@ function Planner() {
       ) : null}
 
       {viewModal.open && viewModal.video ? (
-        <div onMouseDown={(e) => { if (e.target === e.currentTarget) setViewModal({ open: false, topicId: null, video: null }) }} style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '18px', zIndex: 50 }}>
-          <div style={{ width: 'min(600px, 100%)', backgroundColor: '#101010', border: '1px solid #333', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 24px 80px rgba(0,0,0,0.55)' }}>
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '18px', zIndex: 50 }}>
+          <div style={{ width: 'min(800px, 100%)', backgroundColor: '#101010', border: '1px solid #333', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 24px 80px rgba(0,0,0,0.55)' }}>
             <div style={{ padding: '16px', borderBottom: '1px solid #333', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h3 style={{ margin: 0, color: '#fff' }}>{viewModal.video.video_title || 'Untitled'}</h3>
+              <h3 style={{ margin: 0, color: '#fff', wordBreak: 'break-word' }}>{viewModal.video.video_title || 'Untitled'}</h3>
               <button onClick={() => setViewModal({ open: false, topicId: null, video: null })} style={{ background: 'none', border: 'none', color: '#888', fontSize: '20px', cursor: 'pointer' }}>×</button>
             </div>
             <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px', maxHeight: '70vh', overflowY: 'auto' }}>
               <div>
                 <label style={{ fontSize: '12px', color: '#888', marginBottom: '6px', display: 'block' }}>Title</label>
-                <input style={{ width: '100%', padding: '10px', border: '1px solid #333', backgroundColor: '#1a1a1a', color: 'white', borderRadius: '8px', boxSizing: 'border-box' }} value={viewModal.video.video_title || ''} onChange={(e) => setViewModal(p => ({ ...p, video: { ...p.video, video_title: e.target.value } }))} onBlur={() => { if (viewModal.video.id) { patchCardLocal(viewModal.topicId, viewModal.video.id, { video_title: viewModal.video.video_title }); supabase.from('planner_videos').update({ video_title: viewModal.video.video_title }).eq('id', viewModal.video.id).then() } }} />
+                <textarea
+                  style={{ width: '100%', padding: '10px', border: '1px solid #333', backgroundColor: '#1a1a1a', color: 'white', borderRadius: '8px', boxSizing: 'border-box', minHeight: '50px', overflow: 'hidden', fontFamily: 'sans-serif', resize: 'none' }}
+                  value={viewModal.video.video_title || ''}
+                  maxLength="100"
+                  onFocus={(e) => autoExpandTextarea(e)}
+                  onChange={(e) => {
+                    setViewModal(p => ({ ...p, video: { ...p.video, video_title: e.target.value } }))
+                    autoExpandTextarea(e)
+                  }}
+                />
+                <div style={{ fontSize: '12px', color: (viewModal.video.video_title || '').length >= 100 ? '#ef4444' : '#888', marginTop: '4px' }}>
+                  {(viewModal.video.video_title || '').length}/100 - Title limit
+                </div>
               </div>
               <div>
                 <label style={{ fontSize: '12px', color: '#888', marginBottom: '6px', display: 'block' }}>Description</label>
-                <textarea style={{ width: '100%', padding: '10px', border: '1px solid #333', backgroundColor: '#1a1a1a', color: 'white', borderRadius: '8px', boxSizing: 'border-box', minHeight: '100px', fontFamily: 'sans-serif' }} value={viewModal.video.video_description || ''} onChange={(e) => setViewModal(p => ({ ...p, video: { ...p.video, video_description: e.target.value } }))} onBlur={() => { if (viewModal.video.id) { patchCardLocal(viewModal.topicId, viewModal.video.id, { video_description: viewModal.video.video_description }); supabase.from('planner_videos').update({ video_description: viewModal.video.video_description }).eq('id', viewModal.video.id).then() } }} />
+                <textarea
+                  style={{ width: '100%', padding: '10px', border: '1px solid #333', backgroundColor: '#1a1a1a', color: 'white', borderRadius: '8px', boxSizing: 'border-box', minHeight: '100px', overflow: 'hidden', fontFamily: 'sans-serif', resize: 'none' }}
+                  value={viewModal.video.video_description || ''}
+                  maxLength="5000"
+                  onFocus={(e) => autoExpandTextarea(e)}
+                  onChange={(e) => {
+                    setViewModal(p => ({ ...p, video: { ...p.video, video_description: e.target.value } }))
+                    autoExpandTextarea(e)
+                  }}
+                />
               </div>
               <div>
                 <label style={{ fontSize: '12px', color: '#888', marginBottom: '6px', display: 'block' }}>Binded Videos</label>
-                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', padding: '10px 0' }}>
                   {(Array.isArray(viewModal.video.binded_videos) ? viewModal.video.binded_videos : []).map((b, idx) => (
-                    <img key={idx} src={b.thumbnail || ''} alt="" style={{ width: '60px', height: '60px', borderRadius: '8px', border: '1px solid #333', cursor: 'pointer', objectFit: 'cover' }} onClick={() => { const url = b.video_link || (b.video_id ? `https://www.youtube.com/watch?v=${b.video_id}` : ''); if (url) window.open(url, '_blank') }} />
+                    <div key={idx} style={{ position: 'relative', display: 'inline-block' }}>
+                      <img src={b.thumbnail || ''} alt="" style={{ width: '80px', height: '80px', borderRadius: '8px', border: '1px solid #333', cursor: 'pointer', objectFit: 'cover' }} onClick={() => { const url = b.video_link || (b.video_id ? `https://www.youtube.com/watch?v=${b.video_id}` : ''); if (url) window.open(url, '_blank') }} />
+                      <button onClick={() => { const updated = viewModal.video.binded_videos.filter((_, i) => i !== idx); setViewModal(p => ({ ...p, video: { ...p.video, binded_videos: updated } })); if (viewModal.video.id) { patchCardLocal(viewModal.topicId, viewModal.video.id, { binded_videos: updated }); supabase.from('planner_videos').update({ binded_videos: updated }).eq('id', viewModal.video.id).then() } }} style={{ position: 'absolute', top: '-8px', right: '-8px', width: '22px', height: '22px', borderRadius: '50%', backgroundColor: '#ef4444', color: 'white', border: '2px solid #101010', cursor: 'pointer', fontWeight: 'bold', fontSize: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.5)' }}>×</button>
+                    </div>
                   ))}
                 </div>
               </div>
               <div>
                 <label style={{ fontSize: '12px', color: '#888', marginBottom: '6px', display: 'block' }}>Notes</label>
-                <textarea style={{ width: '100%', padding: '10px', border: '1px solid #333', backgroundColor: '#1a1a1a', color: 'white', borderRadius: '8px', boxSizing: 'border-box', minHeight: '80px', fontFamily: 'sans-serif' }} value={viewModal.video.notes || ''} onChange={(e) => setViewModal(p => ({ ...p, video: { ...p.video, notes: e.target.value } }))} onBlur={() => { if (viewModal.video.id) { patchCardLocal(viewModal.topicId, viewModal.video.id, { notes: viewModal.video.notes }); supabase.from('planner_videos').update({ notes: viewModal.video.notes }).eq('id', viewModal.video.id).then() } }} />
+                <textarea
+                  style={{ width: '100%', padding: '10px', border: '1px solid #333', backgroundColor: '#1a1a1a', color: 'white', borderRadius: '8px', boxSizing: 'border-box', minHeight: '80px', overflow: 'hidden', fontFamily: 'sans-serif', resize: 'none' }}
+                  value={viewModal.video.notes || ''}
+                  maxLength="5000"
+                  onFocus={(e) => autoExpandTextarea(e)}
+                  onChange={(e) => {
+                    setViewModal(p => ({ ...p, video: { ...p.video, notes: e.target.value } }))
+                    autoExpandTextarea(e)
+                  }}
+                />
               </div>
             </div>
             <div style={{ padding: '16px', borderTop: '1px solid #333', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
-              <button onClick={() => navigate('/scheduler')} style={{ padding: '10px 20px', backgroundColor: '#fff', color: '#000', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>Schedule</button>
-              <button onClick={() => { supabase.from('planner_videos').delete().eq('id', viewModal.video.id).then(() => { setViewModal({ open: false, topicId: null, video: null }); setByTopic(p => ({ ...p, [viewModal.topicId]: (p[viewModal.topicId] || []).filter(v => v.id !== viewModal.video.id) })) }) }} style={{ padding: '10px 20px', backgroundColor: '#ef4444', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>Delete</button>
+              <button
+                onClick={() => {
+                  if (viewModal.video.id) {
+                    const { video_title, video_description, notes } = viewModal.video
+                    supabase.from('planner_videos')
+                      .update({ video_title, video_description, notes })
+                      .eq('id', viewModal.video.id)
+                      .then(() => {
+                        patchCardLocal(viewModal.topicId, viewModal.video.id, { video_title, video_description, notes })
+                        setToast({ kind: 'success', text: '✅ Saved Changes' })
+                        setTimeout(() => setToast(null), 2000)
+                        setViewModal({ open: false, topicId: null, video: null })
+                      })
+                  }
+                }}
+                style={{ padding: '12px 24px', backgroundColor: '#22c55e', color: '#000', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>
+                Save
+              </button>
+              <button onClick={() => navigate('/scheduler')} style={{ padding: '12px 24px', backgroundColor: '#fff', color: '#000', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>Schedule</button>
+              <button onClick={() => { supabase.from('planner_videos').delete().eq('id', viewModal.video.id).then(() => { setViewModal({ open: false, topicId: null, video: null }); setByTopic(p => ({ ...p, [viewModal.topicId]: (p[viewModal.topicId] || []).filter(v => v.id !== viewModal.video.id) })) }) }} style={{ padding: '12px 24px', backgroundColor: '#ef4444', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>Delete</button>
             </div>
           </div>
         </div>
