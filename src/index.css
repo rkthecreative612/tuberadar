@@ -13,3 +13,26 @@ body {
   width: 100%;
   height: 100%;
 }
+
+.plannerRow {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+}
+
+@media (max-width: 980px) {
+  .plannerRow {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .plannerRow {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.plannerCard:hover {
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.45);
+  transform: translateY(-2px);
+  border-color: #444;
+}

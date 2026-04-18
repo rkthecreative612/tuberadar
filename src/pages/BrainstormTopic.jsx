@@ -1,4 +1,6 @@
-import React, { useState, useEffect } from 'react';
+/* eslint-disable react/prop-types */
+import { useState, useEffect } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import supabase from '../lib/supabase';
 
 // 4. Create brainstorm_items table in Supabase if not exists:
@@ -53,6 +55,7 @@ const listItemStyle = (isSelected) => ({
 const centerPanelStyle = {
   flex: 1,
   padding: '24px',
+  maxHeight: '90vh',
   overflowY: 'auto',
   display: 'flex',
   flexDirection: 'column',
@@ -71,17 +74,37 @@ const rightPanelStyle = {
   gap: '16px'
 };
 
-const BrainstormTopic = ({ topic, onBack }) => {
+const BrainstormTopic = ({ topic: topicProp }) => {
+  const { topicId } = useParams();
+  const navigate = useNavigate();
+
   const [videos, setVideos] = useState([]);
   const [selectedVideo, setSelectedVideo] = useState(null);
-  
+  const [topic, setTopic] = useState(topicProp ?? null);
+
   const [expandedSection, setExpandedSection] = useState(null);
-  
+
   const [ideaTitle, setIdeaTitle] = useState('');
   const [ideaDescription, setIdeaDescription] = useState('');
+  const [plannerErrors, setPlannerErrors] = useState({ title: '', description: '' });
   const [boundVideos, setBoundVideos] = useState([]);
   const [showBindDropdown, setShowBindDropdown] = useState(false);
   const [showPlannerSuccess, setShowPlannerSuccess] = useState(false);
+
+  useEffect(() => {
+    if (topicProp) return;
+    if (!topicId) return;
+
+    let alive = true;
+    const fetchTopic = async () => {
+      const { data, error } = await supabase.from('my_channels').select('*').eq('id', topicId).maybeSingle();
+      if (!alive) return;
+      if (!error && data) setTopic(data);
+    };
+
+    fetchTopic();
+    return () => { alive = false; };
+  }, [topicId, topicProp]);
 
   useEffect(() => {
     if (!topic) return;
@@ -93,9 +116,15 @@ const BrainstormTopic = ({ topic, onBack }) => {
         .order('created_at', { ascending: false });
 
       if (!error && data) {
-        setVideos(data);
+        // Normalize shape so the UI can rely on `commentCount` even if older rows only have `comments`.
+        const normalized = (data || []).map((row) => ({
+          ...row,
+          commentCount: row?.commentCount ?? row?.comments ?? 0,
+        }))
+
+        setVideos(normalized);
         if (data.length > 0) {
-          setSelectedVideo(data[0]);
+          setSelectedVideo(normalized[0]);
         }
       }
     };
@@ -113,7 +142,7 @@ const BrainstormTopic = ({ topic, onBack }) => {
     const newVideos = videos.filter(v => v.id !== id);
     setVideos(newVideos);
     setBoundVideos(b => b.filter(bv => bv.id !== id));
-    
+
     if (selectedVideo?.id === id) {
       setSelectedVideo(newVideos.length > 0 ? newVideos[0] : null);
     }
@@ -126,7 +155,8 @@ const BrainstormTopic = ({ topic, onBack }) => {
   };
 
   const currentTitle = selectedVideo?.title || selectedVideo?.video_title || 'Untitled';
-  const descriptionText = selectedVideo?.description || 'No description available';
+  // Keep the textarea value as the real description; show "No description available" as placeholder instead.
+  const descriptionText = selectedVideo?.description ?? '';
   const tagsText = currentTitle.split(' ').filter(w => w.length > 3).join(', ');
 
   const handleCopy = (text) => {
@@ -135,6 +165,7 @@ const BrainstormTopic = ({ topic, onBack }) => {
 
   const renderGrabber = (id, label, content) => {
     const isExpanded = expandedSection === id;
+    const safeContent = content ?? '';
     return (
       <div style={{ marginBottom: '10px' }}>
         <button
@@ -171,7 +202,8 @@ const BrainstormTopic = ({ topic, onBack }) => {
               <>
                 <textarea
                   readOnly
-                  value={content}
+                  value={safeContent}
+                  placeholder={id === 'description' ? 'No description available' : ''}
                   style={{
                     width: '100%',
                     height: '80px',
@@ -185,7 +217,7 @@ const BrainstormTopic = ({ topic, onBack }) => {
                   }}
                 />
                 <button
-                  onClick={() => handleCopy(content)}
+                  onClick={() => handleCopy(safeContent)}
                   style={{
                     alignSelf: 'flex-start',
                     padding: '6px 16px',
@@ -209,23 +241,48 @@ const BrainstormTopic = ({ topic, onBack }) => {
   };
 
   const handleMoveToPlanner = async () => {
-    if (!topic) return;
-    const { error } = await supabase.from('planner_items').insert({
-      topic_id: topic.id,
-      title: ideaTitle,
-      description: ideaDescription,
-      bound_video_ids: JSON.stringify(boundVideos.map(v => v.video_id || v.id))
-    });
+    const activeTopicId = topic?.id || topicId;
+    if (!activeTopicId) return;
 
-    if (!error) {
+    const nextErrors = {
+      title: ideaTitle.trim() ? '' : 'Title is required',
+      description: ideaDescription.trim() ? '' : 'Description is required',
+    };
+
+    setPlannerErrors(nextErrors);
+    if (nextErrors.title || nextErrors.description) return;
+
+    try {
+      const binded = (boundVideos || []).map((v) => {
+        const vid = v?.video_id || v?.videoId || v?.id;
+        return {
+          video_id: vid,
+          title: v?.title || v?.video_title || '',
+          thumbnail: v?.thumbnail || (vid ? `https://img.youtube.com/vi/${vid}/mqdefault.jpg` : ''),
+          video_link: vid ? `https://www.youtube.com/watch?v=${vid}` : '',
+        };
+      });
+
+      const { error } = await supabase.from('planner_videos').insert({
+        topic_id: activeTopicId,
+        title: ideaTitle.trim(),
+        description: ideaDescription.trim(),
+        binded_videos: binded,
+        notes: '',
+        position: 0,
+      });
+
+      if (error) throw error;
+
       setShowPlannerSuccess(true);
       setTimeout(() => setShowPlannerSuccess(false), 3000);
       setIdeaTitle('');
       setIdeaDescription('');
+      setPlannerErrors({ title: '', description: '' });
       setBoundVideos(selectedVideo ? [selectedVideo] : []);
-    } else {
-      console.error(error);
-      alert('Failed to move to planner');
+    } catch (err) {
+      console.error('Error moving to planner:', err);
+      alert('❌ Failed to move to planner');
     }
   };
 
@@ -243,7 +300,7 @@ const BrainstormTopic = ({ topic, onBack }) => {
                 <div style={{ flex: 1, whiteSpace: 'nowrap', overflow: 'hidden' }} title={t}>
                   {truncate(t, 35)}
                 </div>
-                <div 
+                <div
                   onClick={(e) => handleDelete(e, video.id)}
                   style={{ cursor: 'pointer', opacity: 0.6, padding: '4px', marginLeft: '8px' }}
                   onMouseEnter={(e) => e.target.style.opacity = 1}
@@ -261,14 +318,14 @@ const BrainstormTopic = ({ topic, onBack }) => {
       {/* CENTER PANEL */}
       <div style={centerPanelStyle}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-          <button 
-            onClick={onBack}
+          <button
+            onClick={() => navigate('/brainstorm')}
             style={{ background: 'transparent', border: 'none', color: '#ccc', cursor: 'pointer', fontSize: '14px', fontWeight: 'bold' }}
           >
             &larr; Back to Brainstormer
           </button>
           {selectedVideo && (
-            <button 
+            <button
               onClick={(e) => handleDelete(e, selectedVideo.id)}
               style={{ background: 'transparent', border: '1px solid #444', color: '#ff5252', borderRadius: '6px', padding: '6px 12px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }}
             >
@@ -279,22 +336,28 @@ const BrainstormTopic = ({ topic, onBack }) => {
 
         {selectedVideo ? (
           <div style={{ display: 'flex', flexDirection: 'column', maxWidth: '800px', margin: '0 auto', width: '100%' }}>
-            <img 
+            <img
               src={`https://img.youtube.com/vi/${selectedVideo.video_id}/maxresdefault.jpg`}
-              alt="Thumbnail"
-              style={{ width: '100%', maxHeight: '220px', objectFit: 'cover', borderRadius: '10px', cursor: 'pointer', marginBottom: '16px' }}
-              onClick={() => window.open(`https://img.youtube.com/vi/${selectedVideo.video_id}/maxresdefault.jpg`, '_blank')}
+              onClick={() => window.open(`https://www.youtube.com/watch?v=${selectedVideo.video_id}`, '_blank')}
+              style={{
+                width: "100%",
+                maxHeight: "300px",
+                objectFit: "contain",
+                borderRadius: "8px",
+                marginBottom: "10px",
+                cursor: 'pointer',
+              }}
             />
             <h2 style={{ color: 'white', fontWeight: 'bold', fontSize: '18px', margin: '0 0 16px 0' }}>
               {currentTitle}
             </h2>
-            
+
             <div style={{ display: 'flex', gap: '12px', marginBottom: '24px' }}>
               <div style={{ background: '#1a1a1a', padding: '6px 14px', borderRadius: '20px', color: '#aaa', fontSize: '13px' }}>
-                &#128077; Likes: {selectedVideo.likes || 0}
+                &#128077; Likes: {(Number(selectedVideo.likes) || 0).toLocaleString()}
               </div>
               <div style={{ background: '#1a1a1a', padding: '6px 14px', borderRadius: '20px', color: '#aaa', fontSize: '13px' }}>
-                &#128172; Comments: {selectedVideo.comments || 0}
+                &#128172; Comments: {(selectedVideo?.commentCount || 0).toLocaleString()}
               </div>
               <div style={{ background: '#1a1a1a', padding: '6px 14px', borderRadius: '20px', color: '#aaa', fontSize: '13px' }}>
                 &#11088; Score: {selectedVideo.score || 0}%
@@ -302,11 +365,11 @@ const BrainstormTopic = ({ topic, onBack }) => {
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column' }}>
-              {renderGrabber('thumbnail', '&#128444; Thumbnail', null)}
-              {renderGrabber('title', '&#128221; Title Grabber', currentTitle)}
-              {renderGrabber('description', '&#128196; Description Grabber', descriptionText)}
-              {renderGrabber('tags', '&#127991; Tags', tagsText)}
-              {renderGrabber('summary', '&#10024; Summary', null)}
+              {renderGrabber('thumbnail', '🖼 Thumbnail', null)}
+              {renderGrabber('title', '📝 Title Grabber', currentTitle)}
+              {renderGrabber('description', '📄 Description Grabber', descriptionText)}
+              {renderGrabber('tags', '🏷 Tags', tagsText)}
+              {renderGrabber('summary', '✨ Summary', null)}
             </div>
           </div>
         ) : (
@@ -318,29 +381,45 @@ const BrainstormTopic = ({ topic, onBack }) => {
       <div style={rightPanelStyle}>
         <div>
           <label style={{ display: 'block', color: '#888', fontSize: '12px', marginBottom: '6px' }}>Title</label>
-          <textarea 
+          <textarea
             value={ideaTitle}
-            onChange={(e) => setIdeaTitle(e.target.value)}
+            onChange={(e) => {
+              setIdeaTitle(e.target.value);
+              if (plannerErrors.title) setPlannerErrors((p) => ({ ...p, title: '' }));
+            }}
             placeholder="Write your video title idea..."
             style={{ width: '100%', height: '60px', background: '#1a1a1a', border: '1px solid #333', color: 'white', borderRadius: '8px', padding: '10px', boxSizing: 'border-box', fontFamily: 'sans-serif', resize: 'none' }}
           />
+          {plannerErrors.title ? (
+            <div style={{ color: '#ef4444', fontSize: '12px', marginTop: '6px' }}>
+              {plannerErrors.title}
+            </div>
+          ) : null}
         </div>
-        
+
         <div>
           <label style={{ display: 'block', color: '#888', fontSize: '12px', marginBottom: '6px' }}>Description</label>
-          <textarea 
+          <textarea
             value={ideaDescription}
-            onChange={(e) => setIdeaDescription(e.target.value)}
+            onChange={(e) => {
+              setIdeaDescription(e.target.value);
+              if (plannerErrors.description) setPlannerErrors((p) => ({ ...p, description: '' }));
+            }}
             placeholder="Write your description idea..."
             style={{ width: '100%', height: '120px', background: '#1a1a1a', border: '1px solid #333', color: 'white', borderRadius: '8px', padding: '10px', boxSizing: 'border-box', fontFamily: 'sans-serif', resize: 'none' }}
           />
+          {plannerErrors.description ? (
+            <div style={{ color: '#ef4444', fontSize: '12px', marginTop: '6px' }}>
+              {plannerErrors.description}
+            </div>
+          ) : null}
         </div>
 
         <div>
           <label style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#888', fontSize: '12px', marginBottom: '8px' }}>
             Videos <span style={{ color: '#ff5252', fontSize: '10px' }}>Selected video is bound by default</span>
           </label>
-          
+
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '8px' }}>
             {boundVideos.map(bv => (
               <div key={bv.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#1a1a1a', border: '1px solid #333', padding: '6px 10px', borderRadius: '6px', fontSize: '12px' }}>
@@ -353,7 +432,7 @@ const BrainstormTopic = ({ topic, onBack }) => {
           </div>
 
           <div style={{ position: 'relative' }}>
-            <button 
+            <button
               onClick={() => setShowBindDropdown(!showBindDropdown)}
               style={{ width: '100%', background: 'transparent', border: '1px dashed #555', color: '#ccc', padding: '8px', borderRadius: '6px', cursor: 'pointer', fontSize: '12px' }}
             >
@@ -362,8 +441,8 @@ const BrainstormTopic = ({ topic, onBack }) => {
             {showBindDropdown && (
               <div style={{ position: 'absolute', top: '100%', left: 0, width: '100%', background: '#222', border: '1px solid #444', borderRadius: '6px', marginTop: '4px', zIndex: 10, maxHeight: '150px', overflowY: 'auto' }}>
                 {videos.filter(v => !boundVideos.some(bv => bv.id === v.id)).map(v => (
-                  <div 
-                    key={v.id} 
+                  <div
+                    key={v.id}
                     onClick={() => { setBoundVideos([...boundVideos, v]); setShowBindDropdown(false); }}
                     style={{ padding: '8px', fontSize: '12px', borderBottom: '1px solid #333', cursor: 'pointer' }}
                   >
@@ -376,7 +455,7 @@ const BrainstormTopic = ({ topic, onBack }) => {
         </div>
 
         <div style={{ marginTop: 'auto', paddingTop: '20px' }}>
-          <button 
+          <button
             onClick={handleMoveToPlanner}
             style={{ width: '100%', background: '#e00', color: 'white', fontWeight: 'bold', padding: '12px', border: 'none', borderRadius: '8px', cursor: 'pointer' }}
           >
@@ -384,7 +463,7 @@ const BrainstormTopic = ({ topic, onBack }) => {
           </button>
           {showPlannerSuccess && (
             <div style={{ color: '#4caf50', textAlign: 'center', marginTop: '8px', fontSize: '13px', fontWeight: 'bold' }}>
-              Moved to Planner! &#9989;
+              ✅ Moved to Planner
             </div>
           )}
         </div>

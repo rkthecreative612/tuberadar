@@ -1,4 +1,6 @@
-import React, { useState, useEffect } from 'react';
+/* eslint-disable react/prop-types */
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import supabase from '../lib/supabase';
 
 const cardStyle = {
@@ -99,8 +101,9 @@ const ChannelCard = ({ ch, onClick }) => {
 };
 
 
-const Home = ({ onChannelClick, onAddClick }) => {
+const Home = () => {
   const [channels, setChannels] = useState([]);
+  const navigate = useNavigate();
 
   const fetchChannels = async () => {
     const { data, error } = await supabase.from('my_channels').select('*').order('created_at', { ascending: false });
@@ -142,33 +145,6 @@ const Home = ({ onChannelClick, onAddClick }) => {
   const mainContentStyle = {
     display: 'flex',
     flex: 1,
-    gap: '60px',
-  };
-
-  const leftSectionStyle = {
-    width: '250px',
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '16px',
-    flexShrink: 0,
-  };
-
-  const upcomingTitleStyle = {
-    fontSize: '14px',
-    color: '#888',
-    textTransform: 'uppercase',
-    letterSpacing: '1px',
-    marginBottom: '8px',
-    fontWeight: 'bold'
-  };
-
-  const featureItemStyle = {
-    padding: '14px 16px',
-    backgroundColor: '#1a1a1a',
-    borderRadius: '8px',
-    color: '#ccc',
-    fontSize: '15px',
-    border: '1px solid #222'
   };
 
   const centerAreaStyle = {
@@ -201,19 +177,12 @@ const Home = ({ onChannelClick, onAddClick }) => {
         <h1 style={topBarTextStyle}>Welcome, RK &#128075;</h1>
       </div>
       <div style={mainContentStyle}>
-        <div style={leftSectionStyle}>
-          <div style={upcomingTitleStyle}>Upcoming Features</div>
-          <div style={featureItemStyle}>Video Planner</div>
-          <div style={featureItemStyle}>Brainstormer</div>
-          <div style={featureItemStyle}>AI Insights</div>
-          <div style={featureItemStyle}>Channel Analytics</div>
-        </div>
         <div style={centerAreaStyle}>
           {channels.map((ch) => (
-            <ChannelCard key={ch.id} ch={ch} onClick={onChannelClick} />
+            <ChannelCard key={ch.id} ch={ch} onClick={() => navigate(`/dashboard/${ch.id}`)} />
           ))}
 
-          <div style={addCardStyle} onClick={onAddClick}>
+          <div style={addCardStyle} onClick={() => navigate('/add-channel')}>
             <span style={addIconStyle}>+</span>
             <span style={{ color: '#888', marginTop: '10px', fontSize: '14px', fontWeight: 'bold' }}>Add Channel</span>
           </div>

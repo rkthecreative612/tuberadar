@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import supabase from '../lib/supabase';
 
 const containerStyle = {
@@ -132,10 +133,11 @@ const modalButtonStyle = {
   cursor: 'pointer'
 };
 
-const Brainstorm = ({ setActivePage, onOpenTopic }) => {
+const Brainstorm = () => {
   const [topics, setTopics] = useState([]);
   const [counts, setCounts] = useState({});
   const [showModal, setShowModal] = useState(false);
+  const navigate = useNavigate();
 
   useEffect(() => {
     const fetchData = async () => {
@@ -178,7 +180,7 @@ const Brainstorm = ({ setActivePage, onOpenTopic }) => {
             <div style={buttonRowStyle}>
               <button 
                 style={openButtonStyle}
-                onClick={() => onOpenTopic && onOpenTopic(topic)}
+                onClick={() => navigate(`/brainstorm/${topic.id}`)}
               >
                 Open
               </button>

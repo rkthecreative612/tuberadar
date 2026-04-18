@@ -73,6 +73,8 @@ function MainDashboard({ selectedMyChannel, onBackClick }) {
             publishedAt: item.snippet.publishedAt,
             viewCount: viewCount,
             likeCount: item.likeCount ?? 0,
+            commentCount: item.statistics?.commentCount || 0,
+            description: item.snippet?.description || '',
             phase
           }
         }
@@ -138,6 +140,32 @@ function MainDashboard({ selectedMyChannel, onBackClick }) {
 
         setVideos(allVideos)
 
+        // Best-effort cache/persist competitor video metadata (non-blocking for UI).
+        try {
+          const camelRows = allVideos.map((v) => ({
+            videoId: v.videoId,
+            commentCount: v.commentCount,
+            description: v.description,
+          }))
+
+          const { error: upsertErr } = await supabase
+            .from('competitor_videos')
+            .upsert(camelRows, { onConflict: 'videoId' })
+
+          if (upsertErr) {
+            const snakeRows = allVideos.map((v) => ({
+              video_id: v.videoId,
+              commentCount: v.commentCount,
+              description: v.description,
+            }))
+
+            await supabase.from('competitor_videos').upsert(snakeRows, { onConflict: 'video_id' })
+          }
+        } catch (e) {
+          // Ignore persistence errors; fetching live data should still work.
+          console.log(e)
+        }
+
         // Calculate stats
         const topCount = allVideos.filter(v => v.viewCount > 100000).length;
         let bestChannelName = '—';
@@ -178,36 +206,55 @@ function MainDashboard({ selectedMyChannel, onBackClick }) {
     if (onBackClick) onBackClick()
   }
 
-  const handleMoveToBrainstorm = async (v) => {
-    if (movedVideoIds.has(v.videoId) || !selectedMyChannel) return
-
-    try {
-      const score = calcScore(v)
-      const { error } = await supabase.from('brainstorm_items').insert({
-        topic_id: selectedMyChannel.id,
-        video_id: v.videoId,
-        title: v.title,
-        thumbnail: v.thumbnail,
-        likes: String(v.likeCount || 0),
-        comments: '0',
-        score: String(score),
-        description: "",
-      })
-
-      if (error) {
-        console.error('Insert error:', error)
-        return
-      }
-
-      setMovedVideoIds(prev => {
-        const next = new Set(prev)
-        next.add(v.videoId)
-        return next
-      })
-    } catch (err) {
-      console.error('Failed to move to brainstorm:', err)
+  const handleMoveToBrainstorm = async (video) => {
+    if (!selectedMyChannel || !selectedMyChannel.id) {
+      console.error("Missing selectedMyChannel.id");
+      return;
     }
-  }
+    if (!video || !video.videoId) {
+      console.error("Missing video.videoId");
+      return;
+    }
+
+    console.log("video.videoId", video.videoId);
+    console.log("selectedMyChannel.id", selectedMyChannel.id);
+
+    const { data: existing } = await supabase
+      .from("brainstorm_items")
+      .select("id")
+      .eq("video_id", video.videoId)
+      .eq("topic_id", selectedMyChannel.id)
+      .maybeSingle();
+
+    if (existing) return;
+
+    const { error } = await supabase
+      .from("brainstorm_items")
+      .insert([
+        {
+          topic_id: selectedMyChannel.id,
+          video_id: video.videoId,
+          title: video.title,
+          thumbnail: video.thumbnail,
+          likes: video.likeCount || 0,
+          comments: video.commentCount || 0,
+          score: calcScore(video),
+          description: video.description || "",
+        },
+      ]);
+
+    if (error) {
+      console.error("Insert error:", error);
+      alert("Error moving to Brainstorm: " + error.message);
+    } else {
+      alert("Moved ✅");
+      setMovedVideoIds(prev => {
+        const next = new Set(prev);
+        next.add(video.videoId);
+        return next;
+      });
+    }
+  };
 
   const handleEditSave = async () => {
     if (!selectedMyChannel || !editName.trim()) return
@@ -672,9 +719,7 @@ function MainDashboard({ selectedMyChannel, onBackClick }) {
                                 flex: 1,
                                 ...(isMoved ? { backgroundColor: '#1a1a1a', color: '#4caf50', border: '1px solid #4caf50', cursor: 'default' } : {})
                               }}
-                              onClick={() => {
-                                if (!isMoved) handleMoveToBrainstorm(v)
-                              }}
+                              onClick={() => handleMoveToBrainstorm(v)}
                             >
                               {isMoved ? '✅ Moved' : 'Move to Brainstorm'}
                             </button>

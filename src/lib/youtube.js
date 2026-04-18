@@ -56,12 +56,15 @@ async function fetchSearchWithStats(searchQuery, daysAgo = 2, channelId = null, 
       ...item,
       viewCount: 0,
       likeCount: 0,
+      commentCount: 0,
+      description: item?.snippet?.description ?? '',
     }))
   }
 
   const { data: statsData } = await axios.get('https://www.googleapis.com/youtube/v3/videos', {
     params: {
-      part: 'statistics,contentDetails',
+      // Need snippet.description + statistics.commentCount (and keep duration).
+      part: 'statistics,snippet,contentDetails',
       id: videoIds.join(','),
       key: apiKey,
     },
@@ -75,20 +78,30 @@ async function fetchSearchWithStats(searchQuery, daysAgo = 2, channelId = null, 
     const videoDetails = statsById.get(videoId)
     const stats = videoDetails?.statistics
     const durationStr = videoDetails?.contentDetails?.duration || ''
+    const mergedSnippet = {
+      ...(item?.snippet ?? {}),
+      ...(videoDetails?.snippet ?? {}),
+    }
 
     const viewCount = stats?.viewCount != null ? Number(stats.viewCount) : 0
     const likeCount = stats?.likeCount != null ? Number(stats.likeCount) : 0
+    const commentCount = stats?.commentCount != null ? Number(stats.commentCount) : 0
+    const description = mergedSnippet?.description ?? ''
 
     return {
       ...item,
+      snippet: mergedSnippet,
       durationStr,
       statistics: {
         ...(item.statistics ?? {}),
         viewCount,
         likeCount,
+        commentCount,
       },
       viewCount,
       likeCount,
+      commentCount,
+      description,
     }
   })
 

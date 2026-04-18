@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import supabase from '../lib/supabase';
 
-const AddChannel = ({ onBack, onSave }) => {
+const AddChannel = () => {
   const [channelName, setChannelName] = useState('');
   const [channelUrl, setChannelUrl] = useState('');
   const [competitors, setCompetitors] = useState([
@@ -9,6 +10,7 @@ const AddChannel = ({ onBack, onSave }) => {
   ]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const navigate = useNavigate();
 
   const containerStyle = {
     display: 'flex',
@@ -195,13 +197,13 @@ const AddChannel = ({ onBack, onSave }) => {
     }
 
     setLoading(false);
-    if (onSave) onSave();
+    navigate('/');
   };
 
   return (
     <div style={containerStyle}>
       <div style={topBarStyle}>
-        <button style={backButtonStyle} onClick={onBack}>&larr; Back</button>
+        <button style={backButtonStyle} onClick={() => navigate(-1)}>&larr; Back</button>
         <h1 style={titleStyle}>Add Your Channel</h1>
       </div>
 
@@ -232,7 +234,7 @@ const AddChannel = ({ onBack, onSave }) => {
 
         <h3 style={{ margin: 0, fontSize: '18px', color: '#fff' }}>Add Competitor Channels</h3>
         
-        {competitors.map((comp, idx) => (
+        {competitors.map((comp) => (
           <div key={comp.id} style={competitorRowStyle}>
             <div style={{...inputGroupStyle, flex: 1}}>
               <input 
