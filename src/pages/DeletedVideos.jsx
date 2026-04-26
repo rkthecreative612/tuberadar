@@ -54,7 +54,11 @@ function DeletedVideos() {
 
   const getDaysLeft = (deletedAt) => {
     if (!deletedAt) return 30;
-    const deleted = new Date(deletedAt.includes('Z') ? deletedAt : deletedAt + 'Z');
+    let deleted = new Date(deletedAt);
+    if (isNaN(deleted.getTime()) && !deletedAt.includes('Z') && !deletedAt.includes('+')) {
+      deleted = new Date(deletedAt + 'Z');
+    }
+    if (isNaN(deleted.getTime())) return 0;
     const now = new Date();
     const daysElapsed = Math.floor((now - deleted) / (1000 * 60 * 60 * 24));
     const daysLeft = Math.max(0, 30 - daysElapsed);
@@ -146,9 +150,34 @@ function DeletedVideos() {
                 <div style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: getTopicColor(v.topic_id), flexShrink: 0 }} />
                 
                 {/* Video Info */}
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontWeight: '600', fontSize: '13px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v.video_title}</div>
-                  <div style={{ fontSize: '12px', color: COLORS.textSecondary, marginTop: '4px' }}>{getTopicName(v.topic_id)}</div>
+                <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: '600', fontSize: '13px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      {v.video_title} 
+                      {v.cancellation_reason && <span style={{ fontWeight: 'normal', color: COLORS.textSecondary, fontSize: '11px', fontStyle: 'italic' }}>({v.cancellation_reason})</span>}
+                      {v.is_completed && (
+                        <div 
+                          className="completion-badge" 
+                          style={{ 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            justifyContent: 'center', 
+                            width: '14px', 
+                            height: '14px', 
+                            borderRadius: '50%', 
+                            border: `1px solid ${COLORS.accentGreen}`, 
+                            color: COLORS.accentGreen, 
+                            fontSize: '10px', 
+                            cursor: 'help' 
+                          }}
+                          title="video is completed"
+                        >
+                          ✓
+                        </div>
+                      )}
+                    </div>
+                    <div style={{ fontSize: '12px', color: COLORS.textSecondary, marginTop: '4px' }}>{getTopicName(v.topic_id)}</div>
+                  </div>
                 </div>
 
                 {/* Days Left Badge */}

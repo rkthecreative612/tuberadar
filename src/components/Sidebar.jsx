@@ -109,6 +109,8 @@ function Sidebar() {
       <div style={dividerStyle} />
 
       <nav style={navStyle} aria-label="Navigation">
+        <Item to="/landing" label="Landing" />
+        <Item to="/completed-videos" label="Completed" />
         <Item to="/dashboard" label="Dashboard" end />
         <Item to="/" label="Home" end />
         <Item to="/brainstorm" label="Brainstorm" />

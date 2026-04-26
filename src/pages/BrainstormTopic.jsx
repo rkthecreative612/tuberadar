@@ -1,5 +1,4 @@
-/* eslint-disable react/prop-types */
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import supabase from '../lib/supabase';
 
@@ -77,6 +76,7 @@ const rightPanelStyle = {
 const BrainstormTopic = ({ topic: topicProp }) => {
   const { topicId } = useParams();
   const navigate = useNavigate();
+  const dateInputRef = useRef(null);
 
   const [videos, setVideos] = useState([]);
   const [selectedVideo, setSelectedVideo] = useState(null);
@@ -90,6 +90,7 @@ const BrainstormTopic = ({ topic: topicProp }) => {
   const [boundVideos, setBoundVideos] = useState([]);
   const [showBindDropdown, setShowBindDropdown] = useState(false);
   const [showPlannerSuccess, setShowPlannerSuccess] = useState(false);
+  const [showScheduleSuccess, setShowScheduleSuccess] = useState(false);
 
   useEffect(() => {
     if (topicProp) return;
@@ -294,6 +295,71 @@ const BrainstormTopic = ({ topic: topicProp }) => {
     }
   };
 
+  const handleScheduleVideo = async (selectedDate) => {
+    if (!selectedDate) return;
+    const activeTopicId = topic?.id || topicId;
+    if (!activeTopicId) return;
+
+    const nextErrors = {
+      title: ideaTitle.trim() ? '' : 'Title is required',
+      description: ideaDescription.trim() ? '' : 'Description is required',
+    };
+
+    setPlannerErrors(nextErrors);
+    if (nextErrors.title || nextErrors.description) return;
+
+    try {
+      const [year, month, day] = selectedDate.split('-').map(Number);
+      // Noon normalization to avoid timezone day shifts
+      const targetDate = new Date(year, month - 1, day, 12, 0, 0, 0);
+      const targetISO = targetDate.toISOString();
+
+      const binded = (boundVideos || []).map((v) => {
+        const vid = v?.video_id || v?.videoId || v?.id;
+        return {
+          video_id: vid,
+          title: v?.title || v?.video_title || '',
+          thumbnail: v?.thumbnail || (vid ? `https://img.youtube.com/vi/${vid}/mqdefault.jpg` : ''),
+          video_link: vid ? `https://www.youtube.com/watch?v=${vid}` : '',
+        };
+      });
+
+      const { error } = await supabase.from('planner_videos').insert({
+        topic_id: activeTopicId,
+        video_title: ideaTitle.trim(),
+        video_description: ideaDescription.trim(),
+        binded_videos: binded,
+        notes: '',
+        status: 'scheduled',
+        video_status: 'none',
+        created_at: targetISO,
+        scheduled_time: targetISO,
+        is_completed: false,
+        is_deleted: false,
+      });
+
+      if (error) throw error;
+
+      // Delete the brainstorm_items entry
+      await supabase.from('brainstorm_items').delete().eq('id', selectedVideo.id);
+
+      // Remove from local state
+      const remainingVideos = videos.filter(v => v.id !== selectedVideo.id);
+      setVideos(remainingVideos);
+      setSelectedVideo(remainingVideos.length > 0 ? remainingVideos[0] : null);
+
+      setShowScheduleSuccess(true);
+      setTimeout(() => setShowScheduleSuccess(false), 3000);
+      setIdeaTitle('');
+      setIdeaDescription('');
+      setPlannerErrors({ title: '', description: '' });
+      setBoundVideos(remainingVideos.length > 0 ? [remainingVideos[0]] : []);
+    } catch (err) {
+      console.error('Error scheduling video:', err);
+      alert('❌ Failed to schedule video');
+    }
+  };
+
   return (
     <div style={containerStyle}>
       {/* LEFT PANEL */}
@@ -462,16 +528,37 @@ const BrainstormTopic = ({ topic: topicProp }) => {
           </div>
         </div>
 
-        <div style={{ marginTop: 'auto', paddingTop: '20px' }}>
+        <div style={{ marginTop: 'auto', paddingTop: '20px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          <button
+            onClick={() => dateInputRef.current.showPicker()}
+            style={{ width: '100%', background: '#fff', color: '#000', fontWeight: '900', padding: '12px', border: 'none', borderRadius: '8px', cursor: 'pointer', transition: 'all 0.2s' }}
+            onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#ddd'}
+            onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#fff'}
+          >
+            Schedule
+          </button>
+          <input 
+            type="date"
+            ref={dateInputRef}
+            style={{ position: 'absolute', opacity: 0, pointerEvents: 'none', colorScheme: 'dark' }}
+            onChange={(e) => handleScheduleVideo(e.target.value)}
+          />
           <button
             onClick={handleMoveToPlanner}
-            style={{ width: '100%', background: '#e00', color: 'white', fontWeight: 'bold', padding: '12px', border: 'none', borderRadius: '8px', cursor: 'pointer' }}
+            style={{ width: '100%', background: '#e00', color: 'white', fontWeight: '900', padding: '12px', border: 'none', borderRadius: '8px', cursor: 'pointer', transition: 'all 0.2s' }}
+            onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#f33'}
+            onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#e00'}
           >
             Move to Planner
           </button>
           {showPlannerSuccess && (
             <div style={{ color: '#4caf50', textAlign: 'center', marginTop: '8px', fontSize: '13px', fontWeight: 'bold' }}>
               ✅ Moved to Planner
+            </div>
+          )}
+          {showScheduleSuccess && (
+            <div style={{ color: '#4caf50', textAlign: 'center', marginTop: '8px', fontSize: '13px', fontWeight: 'bold' }}>
+              ✅ Scheduled
             </div>
           )}
         </div>

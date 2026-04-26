@@ -15,6 +15,8 @@ import Scheduler from './pages/Scheduler'
 import Status from './pages/Status'
 import DeletedVideos from './pages/DeletedVideos'
 import SmartSearch from './pages/SmartSearch'
+import Landing from './pages/Landing'
+import CompletedVideos from './pages/CompletedVideos'
 import { deleteOldDeletedVideos } from './lib/autoDeleteOldVideos'
 
 
@@ -62,6 +64,7 @@ function App() {
     <Routes>
       <Route element={<AppLayout />}>
         <Route path="/" element={<Home />} />
+        <Route path="/landing" element={<Landing />} />
         <Route path="/add-channel" element={<AddChannel />} />
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/dashboard/:channelId" element={<Dashboard />} />
@@ -71,6 +74,7 @@ function App() {
         <Route path="/scheduler" element={<Scheduler />} />
         <Route path="/status" element={<Status />} />
         <Route path="/deleted-videos" element={<DeletedVideos />} />
+        <Route path="/completed-videos" element={<CompletedVideos />} />
         <Route path="/smart-search" element={<SmartSearch />} />
 
         <Route path="/stats" element={<Stats />} />

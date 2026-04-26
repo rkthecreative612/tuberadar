@@ -135,14 +135,11 @@ const DroppableDayCell = ({ day, topicColors, onVideoClick }) => {
       ? (isOver ? COLORS.bgCellActive : COLORS.bgCell) 
       : COLORS.bgCellOther,
     opacity: day.isCurrentMonth ? 1 : 0.5,
-    minHeight: 0,
-    height: '120px',
-    overflow: 'hidden',
     position: 'relative',
     boxShadow: isOver ? 'inset 0 0 10px rgba(239, 68, 68, 0.3)' : undefined,
-    borderColor: isOver ? '#ef4444' : (isToday ? '#444' : COLORS.border),
-    borderWidth: isOver ? '2px' : '1px',
+    border: isOver ? '2px solid #ef4444' : (isToday ? '1px solid #555' : 'none'),
     transition: 'all 0.1s ease',
+    overflow: 'hidden'
   };
 
   return (
@@ -228,8 +225,13 @@ const SchedulerCalendar = ({ currentMonth, videos, topicColors, onVideoClick, on
     const weeks = [];
     let currentDate = new Date(firstMonday);
     
-    // Always build 6 weeks for a consistent grid
-    for (let w = 0; w < 6; w++) {
+    // Determine how many weeks are needed (5 or 6)
+    const lastDayOfMonth = new Date(year, month + 1, 0);
+    const endOf5thWeek = new Date(firstMonday);
+    endOf5thWeek.setDate(endOf5thWeek.getDate() + 35);
+    const numWeeksNeeded = lastDayOfMonth >= endOf5thWeek ? 6 : 5;
+
+    for (let w = 0; w < numWeeksNeeded; w++) {
       for (let d = 0; d < 7; d++) {
         const dateStr = getLocalDateString(currentDate);
         weeks.push({
@@ -281,18 +283,19 @@ const SchedulerCalendar = ({ currentMonth, videos, topicColors, onVideoClick, on
           display: 'grid',
           gridTemplateColumns: 'repeat(7, 1fr)',
           backgroundColor: '#161616',
+          borderBottom: `1px solid ${COLORS.border}`,
+          gap: '1px'
         }}>
           {dayOfWeek.map(d => (
             <div key={d} style={{ 
-              padding: '12px 8px', 
+              padding: '10px 8px', 
               textAlign: 'center', 
-              fontSize: '11px', 
-              fontWeight: 'bold', 
-              color: COLORS.textSecondary, 
+              fontSize: '10px', 
+              fontWeight: '900', 
+              color: '#555', 
               textTransform: 'uppercase', 
-              letterSpacing: '1px',
-              borderRight: `1px solid ${COLORS.border}`,
-              borderBottom: `1px solid ${COLORS.border}`
+              letterSpacing: '0.1em',
+              backgroundColor: '#0f0f0f'
             }}>{d}</div>
           ))}
         </div>
@@ -301,9 +304,11 @@ const SchedulerCalendar = ({ currentMonth, videos, topicColors, onVideoClick, on
         <div style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(7, 1fr)',
-          gridTemplateRows: 'repeat(6, 1fr)',
+          gridTemplateRows: `repeat(${calendarGrid.length / 7}, 1fr)`,
           flex: 1,
           minHeight: 0,
+          backgroundColor: COLORS.border, // Becomes the gap/border color
+          gap: '1px'
         }}>
           {calendarGrid.map((day, idx) => (
             <DroppableDayCell 

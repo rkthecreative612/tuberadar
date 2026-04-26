@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { DndContext, PointerSensor, closestCenter, useSensor, useSensors } from '@dnd-kit/core'
 import { SortableContext, useSortable, arrayMove, verticalListSortingStrategy } from '@dnd-kit/sortable'
@@ -86,6 +86,7 @@ function Planner() {
   const [deleteModal, setDeleteModal] = useState({ open: false, topicId: null, cardId: null })
   const [schedulingCardId, setSchedulingCardId] = useState(null)
   const [toast, setToast] = useState(null) // { text, kind }
+  const dateInputRef = useRef(null)
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }))
 
@@ -161,6 +162,7 @@ function Planner() {
       binded_videos: binded,
       notes: addForm.notes.trim(),
       position: nextPosition,
+      original_added_at: new Date().toISOString(),
     }
 
     const { data, error } = await supabase.from('planner_videos').insert(payload).select('*').single()
@@ -177,6 +179,55 @@ function Planner() {
 
     closeAddModal()
     alert('✅ Video added to Planner')
+  }
+
+  async function saveScheduledVideo(date) {
+    const title = addForm.title.trim()
+    const description = addForm.description.trim()
+
+    const next = {
+      title: title ? '' : 'Title is required',
+      description: description ? '' : 'Description is required',
+    }
+    setAddErrors(next)
+    if (next.title || next.description) return
+
+    const topic = addModal.topic
+    if (!topic?.id) return
+
+    const binded = (addForm.bindedLinks || [])
+      .map((s) => String(s || '').trim())
+      .filter(Boolean)
+      .map((link) => {
+        const id = extractYouTubeId(link)
+        return {
+          video_id: id,
+          video_link: id ? `https://www.youtube.com/watch?v=${id}` : link,
+          thumbnail: id ? `https://img.youtube.com/vi/${id}/mqdefault.jpg` : '',
+        }
+      })
+
+    const payload = {
+      topic_id: topic.id,
+      status: 'scheduled',
+      video_title: title,
+      video_description: description,
+      binded_videos: binded,
+      notes: addForm.notes.trim(),
+      created_at: `${date}T00:00:00Z`, // Align with Scheduler logic
+      original_added_at: new Date().toISOString(),
+    }
+
+    const { error } = await supabase.from('planner_videos').insert(payload)
+    if (error) {
+      console.log(error)
+      alert('Failed to schedule video: ' + error.message)
+      return
+    }
+
+    closeAddModal()
+    navigate('/scheduler')
+    alert('✅ Video scheduled for ' + date)
   }
 
   useEffect(() => {
@@ -676,9 +727,34 @@ function Planner() {
               </div>
             </div>
 
-            <div style={{ padding: '16px', borderTop: `1px solid ${COLORS.borderDefault}`, display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+            <div style={{ padding: '16px', borderTop: `1px solid ${COLORS.borderDefault}`, display: 'flex', justifyContent: 'flex-end', gap: '10px', position: 'relative' }}>
+              <input 
+                type="date" 
+                ref={dateInputRef}
+                style={{ position: 'absolute', visibility: 'hidden', bottom: '100%', right: '90px' }}
+                onChange={(e) => {
+                  if (e.target.value) saveScheduledVideo(e.target.value)
+                }}
+              />
               <button type="button" onClick={addPlannerVideo} style={{ padding: '12px 24px', backgroundColor: COLORS.buttonBgSuccess, color: COLORS.buttonTextPrimary, border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>Add</button>
-              <button type="button" onClick={() => navigate('/scheduler')} style={{ padding: '12px 24px', backgroundColor: COLORS.textPrimary, color: COLORS.buttonTextPrimary, border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>Schedule</button>
+              <button 
+                type="button" 
+                onClick={() => {
+                  const title = addForm.title.trim()
+                  const description = addForm.description.trim()
+                  if (!title || !description) {
+                    setAddErrors({
+                      title: title ? '' : 'Title is required',
+                      description: description ? '' : 'Description is required',
+                    })
+                    return
+                  }
+                  dateInputRef.current.showPicker?.() || dateInputRef.current.click()
+                }} 
+                style={{ padding: '12px 24px', backgroundColor: COLORS.textPrimary, color: COLORS.buttonTextPrimary, border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}
+              >
+                Schedule
+              </button>
               <button type="button" onClick={closeAddModal} style={{ padding: '12px 24px', backgroundColor: COLORS.buttonBgDanger, color: COLORS.textPrimary, border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>Delete</button>
             </div>
           </div>

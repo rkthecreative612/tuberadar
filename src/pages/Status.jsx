@@ -279,7 +279,8 @@ const Status = () => {
           topic_id: topicId,
           video_status: targetColumn.column_key,
           status: 'status_only',
-          position: 0
+          position: 0,
+          original_added_at: new Date().toISOString(),
         });
 
       if (error) throw error;
