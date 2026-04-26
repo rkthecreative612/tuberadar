@@ -1,4 +1,6 @@
+import { useEffect } from 'react'
 import { Navigate, Outlet, Route, Routes } from 'react-router-dom'
+
 import Sidebar from './components/Sidebar'
 
 import Home from './pages/Home'
@@ -10,6 +12,13 @@ import Dashboard from './pages/Dashboard'
 import Stats from './pages/Stats'
 import RevenueTracker from './pages/RevenueTracker'
 import Scheduler from './pages/Scheduler'
+import Status from './pages/Status'
+import DeletedVideos from './pages/DeletedVideos'
+import SmartSearch from './pages/SmartSearch'
+import { deleteOldDeletedVideos } from './lib/autoDeleteOldVideos'
+
+
+
 
 function AppLayout() {
   const shellStyle = {
@@ -36,7 +45,20 @@ function AppLayout() {
 }
 
 function App() {
+  useEffect(() => {
+    // Run auto-delete check when app loads
+    deleteOldDeletedVideos();
+    
+    // Also run it every hour
+    const interval = setInterval(() => {
+      deleteOldDeletedVideos();
+    }, 60 * 60 * 1000);
+
+    return () => clearInterval(interval);
+  }, []);
+
   return (
+
     <Routes>
       <Route element={<AppLayout />}>
         <Route path="/" element={<Home />} />
@@ -47,7 +69,12 @@ function App() {
         <Route path="/brainstorm/:topicId" element={<BrainstormTopic />} />
         <Route path="/planner" element={<Planner />} />
         <Route path="/scheduler" element={<Scheduler />} />
+        <Route path="/status" element={<Status />} />
+        <Route path="/deleted-videos" element={<DeletedVideos />} />
+        <Route path="/smart-search" element={<SmartSearch />} />
+
         <Route path="/stats" element={<Stats />} />
+
         <Route path="/revenue" element={<RevenueTracker />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>

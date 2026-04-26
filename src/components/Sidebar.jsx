@@ -114,7 +114,11 @@ function Sidebar() {
         <Item to="/brainstorm" label="Brainstorm" />
         <Item to="/planner" label="Planner" />
         <Item to="/scheduler" label="Scheduler" />
+        <Item to="/status" label="Status" />
+        <Item to="/smart-search" label="Smart Search" />
+        <Item to="/deleted-videos" label="Deleted Videos" />
         <Item to="/stats" label="Stats" />
+
         <Item to="/revenue" label="Revenue tracker" />
       </nav>
     </aside>

@@ -63,6 +63,7 @@ const InlineScheduler = ({ video, onSave, onCancel }) => {
 
       const updateObj = { 
         status: 'scheduled', 
+        video_status: 'none',
         created_at: localDate.toISOString() 
       };
 

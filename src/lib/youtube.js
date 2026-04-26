@@ -144,3 +144,104 @@ export async function searchByChannel(channelUrlOrHandle, _contentType = 'videos
     return []
   }
 }
+
+export async function searchChannelByKeyword(keyword, channelHandle, searchFields = ['title']) {
+  /**
+   * Search within a specific YouTube channel by keyword
+   * Returns videos where keyword appears in title or description based on searchFields array
+   */
+  
+  const YOUTUBE_API_KEY = import.meta.env.VITE_YOUTUBE_API_KEY;
+  
+  if (!YOUTUBE_API_KEY) {
+    console.error('YouTube API Key not found');
+    return [];
+  }
+
+  try {
+    // Get channel ID from handle
+    const channelResponse = await fetch(
+      `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(channelHandle)}&type=channel&maxResults=1&key=${YOUTUBE_API_KEY}`
+    );
+    
+    const channelData = await channelResponse.json();
+    
+    if (!channelData.items || channelData.items.length === 0) {
+      return [];
+    }
+    
+    const channelId = channelData.items[0].id.channelId;
+
+    // Search videos in that channel by keyword
+    const searchResponse = await fetch(
+      `https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${channelId}&q=${encodeURIComponent(keyword)}&maxResults=50&type=video&key=${YOUTUBE_API_KEY}`
+    );
+    
+    const searchData = await searchResponse.json();
+
+    if (!searchData.items || searchData.items.length === 0) {
+      return [];
+    }
+
+    // Get video IDs
+    const videoIds = searchData.items.map(item => item.id.videoId).join(',');
+
+    // Get video statistics
+    const statsResponse = await fetch(
+      `https://www.googleapis.com/youtube/v3/videos?part=statistics,contentDetails,snippet&id=${videoIds}&key=${YOUTUBE_API_KEY}`
+    );
+
+    const statsData = await statsResponse.json();
+
+    // Filter & format videos
+    const videos = statsData.items
+      .filter(video => {
+        const title = video.snippet.title.toLowerCase();
+        const description = video.snippet.description.toLowerCase();
+        const keywordLower = keyword.toLowerCase();
+        
+        const matchTitle = searchFields.includes('title') && title.includes(keywordLower);
+        const matchDescription = searchFields.includes('description') && description.includes(keywordLower);
+        
+        return matchTitle || matchDescription;
+      })
+      .filter(video => {
+        // Exclude shorts (< 60 seconds)
+        const duration = video.contentDetails.duration;
+        const durationSeconds = convertDurationToSeconds(duration);
+        return durationSeconds >= 60;
+      })
+      .map(video => ({
+        title: video.snippet.title,
+        views: parseInt(video.statistics.viewCount || 0),
+        likes: parseInt(video.statistics.likeCount || 0),
+        thumbnail: video.snippet.thumbnails.medium.url,
+        videoId: video.id,
+        publishedAt: new Date(video.snippet.publishedAt),
+        description: video.snippet.description,
+        commentCount: parseInt(video.statistics.commentCount || 0),
+        duration: video.contentDetails.duration
+      }))
+      .sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt)); // Newest first
+
+    return videos;
+
+  } catch (error) {
+    console.error('Error searching channel:', error);
+    return [];
+  }
+}
+
+function convertDurationToSeconds(duration) {
+  /**
+   * Convert ISO 8601 duration (PT15M32S) to seconds
+   */
+  const regex = /PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/;
+  const matches = duration.match(regex);
+  
+  const hours = parseInt(matches?.[1] || 0);
+  const minutes = parseInt(matches?.[2] || 0);
+  const seconds = parseInt(matches?.[3] || 0);
+  
+  return hours * 3600 + minutes * 60 + seconds;
+}

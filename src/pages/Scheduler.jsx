@@ -58,7 +58,9 @@ const Scheduler = () => {
       const { data: videosData, error: videosError } = await supabase
         .from('planner_videos')
         .select('*')
+        .eq('is_deleted', false)
         .eq('status', 'scheduled');
+
 
       if (videosError) throw videosError;
       
@@ -115,8 +117,10 @@ const Scheduler = () => {
     setActiveFilters(next);
   };
 
-  const onDeleteSuccess = (deletedId) => {
+  const onDeleteSuccess = (deletedId, message = 'Video deleted') => {
     setVideos(prev => prev.filter(v => v.id !== deletedId));
+    setToast({ text: `✅ ${message}`, kind: 'success' });
+    setTimeout(() => setToast(null), 3000);
   };
 
   const onMoveVideo = async (videoId, newDateStr) => {
@@ -313,6 +317,8 @@ const Scheduler = () => {
           onUpdateSuccess={(updatedVideo) => {
             setVideos(prev => prev.map(v => v.id === updatedVideo.id ? updatedVideo : v));
             setSelectedVideo(updatedVideo);
+            setToast({ text: '✅ Video updated', kind: 'success' });
+            setTimeout(() => setToast(null), 3000);
           }}
         />
       )}

@@ -134,6 +134,7 @@ function Planner() {
       .from('planner_videos')
       .select('position')
       .eq('topic_id', topic.id)
+      .eq('is_deleted', false)
       .order('position', { ascending: false })
       .limit(1)
       .maybeSingle()
@@ -202,8 +203,9 @@ function Planner() {
             .from('planner_videos')
             .select('*')
             .eq('topic_id', t.id)
+            .eq('is_deleted', false)
+            .eq('status', 'planning')
             .order('position', { ascending: true })
-            .order('created_at', { ascending: true })
           
           const normalized = (data || []).map(video => ({
             ...video,
@@ -228,7 +230,7 @@ function Planner() {
     }
   }, [])
 
-  const topicRows = useMemo(() => chunk(topics, 3), [topics])
+  const topicRows = useMemo(() => chunk(topics, 4), [topics])
 
   const pageStyle = {
     height: '100%',
@@ -250,8 +252,8 @@ function Planner() {
 
   const rowStyle = {
     display: 'grid',
-    gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
-    gap: '20px',
+    gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
+    gap: '16px',
   }
 
   const colStyle = {
@@ -275,7 +277,7 @@ function Planner() {
 
   const colTitleStyle = {
     margin: 0,
-    fontSize: '13px',
+    fontSize: '12px',
     fontWeight: 800,
     letterSpacing: '0.02em',
     overflow: 'hidden',
@@ -296,10 +298,10 @@ function Planner() {
   }
 
   const colBodyStyle = {
-    padding: '12px',
+    padding: '10px',
     display: 'flex',
     flexDirection: 'column',
-    gap: '10px',
+    gap: '8px',
   }
 
   const cardStyle = {
@@ -326,7 +328,7 @@ function Planner() {
     gap: '10px',
   }
 
-  const h3Style = { margin: 0, fontSize: '13px', fontWeight: 800, lineHeight: 1.2 }
+  const h3Style = { margin: 0, fontSize: '12px', fontWeight: 800, lineHeight: 1.2 }
 
   const fieldLabelStyle = { fontSize: '11px', color: '#9a9a9a', marginBottom: '6px' }
 
@@ -479,7 +481,10 @@ function Planner() {
       return
     }
 
-    const { error } = await supabase.from('planner_videos').delete().eq('id', cardId)
+    const { error } = await supabase
+      .from('planner_videos')
+      .update({ is_deleted: true, deleted_at: new Date().toISOString() })
+      .eq('id', cardId)
     if (error) {
       console.log(error)
       setToast({ kind: 'error', text: error.message || 'Failed to delete' })
@@ -572,22 +577,6 @@ function Planner() {
                                         </button>
                                       </div>
 
-                                      {schedulingCardId === v.id && (
-                                        <InlineScheduler 
-                                          video={v}
-                                          onCancel={() => setSchedulingCardId(null)}
-                                          onSave={(videoId) => {
-                                            setSchedulingCardId(null);
-                                            setByTopic(prev => {
-                                              const next = { ...prev };
-                                              Object.keys(next).forEach(tid => {
-                                                next[tid] = next[tid].filter(row => row.id !== videoId);
-                                              });
-                                              return next;
-                                            });
-                                          }}
-                                        />
-                                      )}
                                     </div>
                                 </div>
                               )}
@@ -600,8 +589,8 @@ function Planner() {
                 )
               })}
 
-              {row.length < 3
-                ? Array.from({ length: 3 - row.length }).map((_, i) => (
+              {row.length < 4
+                ? Array.from({ length: 4 - row.length }).map((_, i) => (
                   <div key={`spacer-${i}`} style={{ border: '1px dashed #333', borderRadius: '8px' }} />
                 ))
                 : null}
@@ -859,6 +848,63 @@ function Planner() {
           </div>
         </div>
       ) : null}
+
+      {schedulingCardId && (
+        <div 
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0,0,0,0.7)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            padding: '18px',
+          }}
+          onClick={(e) => {
+            // Close if clicking the overlay background, not the modal content
+            if (e.target === e.currentTarget) {
+              setSchedulingCardId(null);
+            }
+          }}
+        >
+          <div 
+            style={{
+              backgroundColor: COLORS.bgModal,
+              border: `1px solid ${COLORS.borderDefault}`,
+              borderRadius: '12px',
+              padding: '20px',
+              maxWidth: '500px',
+              width: '100%',
+              maxHeight: '90vh',
+              overflowY: 'auto',
+              boxShadow: '0 20px 60px rgba(0,0,0,0.6)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '12px',
+            }}
+            onClick={(e) => {
+              // Prevent closing when clicking inside the modal
+              e.stopPropagation();
+            }}
+          >
+            <InlineScheduler 
+              video={Object.values(byTopic).flat().find(v => v.id === schedulingCardId)}
+              onCancel={() => setSchedulingCardId(null)}
+              onSave={(videoId) => {
+                setSchedulingCardId(null);
+                setByTopic(prev => {
+                  const next = { ...prev };
+                  Object.keys(next).forEach(tid => {
+                    next[tid] = next[tid].filter(row => row.id !== videoId);
+                  });
+                  return next;
+                });
+              }}
+            />
+          </div>
+        </div>
+      )}
     </DndContext>
   )
 }
