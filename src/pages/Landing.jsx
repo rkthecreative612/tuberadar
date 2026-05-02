@@ -24,23 +24,23 @@ const timeAgo = (dateString) => {
   if (!dateString) return ''
   const d = new Date(dateString)
   const now = new Date()
-  
+
   // Normalize to midnight for day comparison
   const dMid = new Date(d.getFullYear(), d.getMonth(), d.getDate())
   const nMid = new Date(now.getFullYear(), now.getMonth(), now.getDate())
   const diffDays = Math.round((nMid - dMid) / (1000 * 60 * 60 * 24))
-  
+
   let relative = ''
   if (diffDays === 0) relative = 'Today'
   else if (diffDays === 1) relative = 'Yesterday'
   else relative = `${diffDays} day${diffDays !== 1 ? 's' : ''} ago`
-  
+
   return `${months[d.getMonth()]} ${d.getDate()} (${relative})`
 }
 
 const AnimatedNumber = ({ value, suffix = '' }) => {
   const [displayValue, setDisplayValue] = useState(0)
-  
+
   useEffect(() => {
     let start = 0
     const end = parseInt(value) || 0
@@ -48,12 +48,12 @@ const AnimatedNumber = ({ value, suffix = '' }) => {
       setDisplayValue(0)
       return
     }
-    
+
     const duration = 800
     const frameDuration = 1000 / 60
     const totalFrames = Math.round(duration / frameDuration)
     const increment = end / totalFrames
-    
+
     let frame = 0
     const timer = setInterval(() => {
       frame++
@@ -64,10 +64,10 @@ const AnimatedNumber = ({ value, suffix = '' }) => {
         setDisplayValue(Math.floor(increment * frame))
       }
     }, frameDuration)
-    
+
     return () => clearInterval(timer)
   }, [value])
-  
+
   return <span>{displayValue}{suffix}</span>
 }
 
@@ -121,23 +121,23 @@ const Landing = () => {
 
     if (cached && cachedDate === today) {
       setQuote(JSON.parse(cached))
-    } else {
-      try {
-        // Clear cache if date changed
-        localStorage.removeItem('dailyQuote')
-        localStorage.removeItem('quoteDate')
+      return
+    }
 
-        const res = await fetch('https://api.quotable.io/random')
-        if (!res.ok) throw new Error('API failed')
-        const data = await res.json()
-        const newQuote = { text: data.content, author: data.author }
-        
-        setQuote(newQuote)
-        localStorage.setItem('dailyQuote', JSON.stringify(newQuote))
-        localStorage.setItem('quoteDate', today)
-      } catch (err) {
-        console.error('Quote fetch failed:', err)
-      }
+    localStorage.removeItem('dailyQuote')
+    localStorage.removeItem('quoteDate')
+
+    try {
+      const res = await fetch('https://api.allorigins.win/raw?url=https://zenquotes.io/api/random')
+      if (!res.ok) throw new Error('API failed')
+      const data = await res.json()
+      const newQuote = { text: data[0].q, author: data[0].a }
+
+      setQuote(newQuote)
+      localStorage.setItem('dailyQuote', JSON.stringify(newQuote))
+      localStorage.setItem('quoteDate', today)
+    } catch (err) {
+      console.error('Quote fetch failed:', err)
     }
   }
 
@@ -157,21 +157,21 @@ const Landing = () => {
           .select('*')
           .eq('is_deleted', false)
           .eq('status', 'scheduled')
-        
+
         if (vErr) throw vErr
 
         // Normalize created_at for consistent date parsing
         const normalizedVideos = (vData || []).map(video => ({
           ...video,
-          created_at: video.created_at && !video.created_at.includes('Z') 
-            ? `${video.created_at}Z` 
+          created_at: video.created_at && !video.created_at.includes('Z')
+            ? `${video.created_at}Z`
             : video.created_at
         }));
 
         const { data: cData, error: cErr } = await supabase
           .from('my_channels')
           .select('id, name')
-        
+
         if (cErr) throw cErr
 
         setVideosData(normalizedVideos)
@@ -199,7 +199,7 @@ const Landing = () => {
   // SECTION 2 DATA: Dynamic Overview
   const overviewData = useMemo(() => {
     const today = new Date()
-    
+
     // Month range
     const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1)
     const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0)
@@ -247,17 +247,17 @@ const Landing = () => {
     const lastOfPrev = new Date(firstOfCurrent)
     lastOfPrev.setDate(0)
     const firstOfPrev = new Date(lastOfPrev.getFullYear(), lastOfPrev.getMonth(), 1)
-    
+
     const startStr = firstOfPrev.toLocaleDateString('en-CA')
     const endStr = lastOfPrev.toLocaleDateString('en-CA')
-    
+
     const filtered = videosData.filter(v => {
       if (!v.created_at) return false
       const d = new Date(v.created_at)
       const dateStr = d.toLocaleDateString('en-CA')
       return dateStr >= startStr && dateStr <= endStr
     })
-    
+
     return {
       planned: filtered.length,
       completed: filtered.filter(v => v.is_completed).length
@@ -293,7 +293,7 @@ const Landing = () => {
   const insightsData = useMemo(() => {
     const today = new Date()
     let start, end
-    
+
     if (selectedInsightsPeriod === 'week') {
       const day = today.getDay()
       const diff = today.getDate() - day + (day === 0 ? -6 : 1)
@@ -338,7 +338,7 @@ const Landing = () => {
 
       const current = getTopicStats(start, end)
       const prev = getTopicStats(pStart, pEnd)
-      
+
       return {
         id: channel.id,
         name: channel.name,
@@ -362,9 +362,9 @@ const Landing = () => {
           .from('planner_videos')
           .update({ is_completed: true, completed_at: completedAt })
           .eq('id', videoId)
-        
+
         if (error) throw error
-        
+
         setVideosData(prev => prev.map(v => v.id === videoId ? { ...v, is_completed: true, completed_at: completedAt } : v))
         showToast('✅ Video marked complete')
       } catch (err) {
@@ -381,9 +381,9 @@ const Landing = () => {
         .from('planner_videos')
         .update({ status: 'planning', updated_at: new Date().toISOString() })
         .eq('id', videoId)
-      
+
       if (error) throw error
-      
+
       setVideosData(prev => prev.filter(v => v.id !== videoId))
       showToast('✅ Video moved back to Planner')
     } catch (err) {
@@ -398,14 +398,14 @@ const Landing = () => {
       try {
         const { error } = await supabase
           .from('planner_videos')
-          .update({ 
-            cancellation_reason: reason, 
+          .update({
+            cancellation_reason: reason,
             is_completed: true,
             is_deleted: true,
             deleted_at: new Date().toISOString()
           })
           .eq('id', cancelingVideoId)
-        
+
         if (error) throw error
 
         setVideosData(prev => prev.filter(v => v.id !== cancelingVideoId))
@@ -569,20 +569,20 @@ const Landing = () => {
           </div>
         ) : (
           overdueVideos.map(video => (
-          <div key={video.id} className={isDoneAnimating === video.id ? 'anim-done' : ''} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: COLORS.bgCard, borderLeft: `4px solid ${topicColorMap[video.topic_id] || COLORS.red}`, padding: '16px', borderRadius: '4px', marginBottom: '12px', gap: '20px' }}>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontWeight: 'bold', fontSize: '16px' }}>{video.video_title}</div>
-              <div style={{ color: COLORS.textSecondary, fontSize: '12px', marginTop: '4px' }}>
-                Category: [{channelMap[video.topic_id] || 'Unknown Topic'}] — Scheduled: {timeAgo(video.created_at)}
+            <div key={video.id} className={isDoneAnimating === video.id ? 'anim-done' : ''} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: COLORS.bgCard, borderLeft: `4px solid ${topicColorMap[video.topic_id] || COLORS.red}`, padding: '16px', borderRadius: '4px', marginBottom: '12px', gap: '20px' }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 'bold', fontSize: '16px' }}>{video.video_title}</div>
+                <div style={{ color: COLORS.textSecondary, fontSize: '12px', marginTop: '4px' }}>
+                  Category: [{channelMap[video.topic_id] || 'Unknown Topic'}] — Scheduled: {timeAgo(video.created_at)}
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button onClick={() => handleMarkDone(video.id)} style={{ backgroundColor: COLORS.green, padding: '10px 12px', fontSize: '8px', fontWeight: 800, borderRadius: '4px', color: 'white' }}>DONE</button>
+                <button onClick={() => handleReschedule(video.id)} style={{ backgroundColor: COLORS.blue, padding: '10px 12px', fontSize: '8px', fontWeight: 800, borderRadius: '4px', color: 'white' }}>RE-SCHEDULED</button>
+                <button onClick={() => { setCancelingVideoId(video.id); setShowCancelModal(true); }} style={{ backgroundColor: COLORS.red, padding: '10px 12px', fontSize: '8px', fontWeight: 800, borderRadius: '4px', color: 'white' }}>CANCELED</button>
               </div>
             </div>
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <button onClick={() => handleMarkDone(video.id)} style={{ backgroundColor: COLORS.green, padding: '10px 12px', fontSize: '8px', fontWeight: 800, borderRadius: '4px', color: 'white' }}>DONE</button>
-              <button onClick={() => handleReschedule(video.id)} style={{ backgroundColor: COLORS.blue, padding: '10px 12px', fontSize: '8px', fontWeight: 800, borderRadius: '4px', color: 'white' }}>RE-SCHEDULED</button>
-              <button onClick={() => { setCancelingVideoId(video.id); setShowCancelModal(true); }} style={{ backgroundColor: COLORS.red, padding: '10px 12px', fontSize: '8px', fontWeight: 800, borderRadius: '4px', color: 'white' }}>CANCELED</button>
-            </div>
-          </div>
-        )))}
+          )))}
       </section>
 
       {/* SECTION 4: UPCOMINGS */}
@@ -645,7 +645,7 @@ const Landing = () => {
             return (
               <div key={topic.id} className="insight-card" style={{ flex: '0 0 200px', backgroundColor: COLORS.bgCard, padding: '20px', borderRadius: '12px', borderLeft: `4px solid ${topicColorMap[topic.id] || '#333'}` }}>
                 <div style={{ fontWeight: '900', fontSize: '16px', marginBottom: '16px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{topic.name}</div>
-                
+
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '20px' }}>
                   <div style={{ fontSize: '13px', color: COLORS.textSecondary }}>
                     No. of uploads : <span style={{ color: 'white', fontWeight: '700' }}>{topic.uploads}</span>
@@ -656,7 +656,7 @@ const Landing = () => {
                 </div>
 
                 <div style={{ borderTop: '1px solid #333', paddingTop: '12px', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '10px', color: COLORS.textMuted }}>
-                  Compared to Previous month: 
+                  Compared to Previous month:
                   {diff === 0 ? (
                     <span style={{ color: COLORS.green }}>✓</span>
                   ) : (

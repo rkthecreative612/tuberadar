@@ -118,6 +118,7 @@ function Sidebar() {
         <Item to="/scheduler" label="Scheduler" />
         <Item to="/status" label="Status" />
         <Item to="/smart-search" label="Smart Search" />
+        <Item to="/ai-summary" label="AI Summary" />
         <Item to="/deleted-videos" label="Deleted Videos" />
         <Item to="/stats" label="Stats" />
 

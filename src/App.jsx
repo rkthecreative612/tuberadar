@@ -17,6 +17,8 @@ import DeletedVideos from './pages/DeletedVideos'
 import SmartSearch from './pages/SmartSearch'
 import Landing from './pages/Landing'
 import CompletedVideos from './pages/CompletedVideos'
+import AISummary from './pages/AISummary'
+import TopicRevenueDetail from './pages/TopicRevenueDetail'
 import { deleteOldDeletedVideos } from './lib/autoDeleteOldVideos'
 
 
@@ -33,7 +35,7 @@ function AppLayout() {
   const mainStyle = {
     flex: 1,
     height: '100vh',
-    overflow: 'hidden',
+    overflowY: 'auto',
   }
 
   return (
@@ -76,10 +78,12 @@ function App() {
         <Route path="/deleted-videos" element={<DeletedVideos />} />
         <Route path="/completed-videos" element={<CompletedVideos />} />
         <Route path="/smart-search" element={<SmartSearch />} />
+        <Route path="/ai-summary" element={<AISummary />} />
 
         <Route path="/stats" element={<Stats />} />
 
         <Route path="/revenue" element={<RevenueTracker />} />
+        <Route path="/topic-revenue/:channelId" element={<TopicRevenueDetail />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>
