@@ -59,7 +59,7 @@ function Dashboard() {
   return (
     <MainDashboard
       selectedMyChannel={selectedMyChannel}
-      onBackClick={() => navigate('/')}
+      onBackClick={() => navigate('/home')}
     />
   )
 }

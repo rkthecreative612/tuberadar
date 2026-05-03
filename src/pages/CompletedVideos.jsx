@@ -12,7 +12,10 @@ const COLORS = {
   modalBg: '#111',
 };
 
-const TOPIC_COLORS = ['#ef4444', '#22c55e', '#3b82f6', '#a855f7', '#f59e0b', '#06b6d4'];
+const TOPIC_COLORS = [
+  '#ef4444', '#22c55e', '#3b82f6', '#a855f7', '#f59e0b', '#06b6d4',
+  '#ec4899', '#8b5cf6', '#10b981', '#6366f1', '#f43f5e', '#14b8a6'
+];
 
 function CompletedVideos() {
   const [completedVideos, setCompletedVideos] = useState([]);
@@ -47,6 +50,8 @@ function CompletedVideos() {
   }, []);
 
   const getTopicColor = (topicId) => {
+    const topic = topics.find(t => t.id === topicId);
+    if (topic && topic.color) return topic.color;
     const index = topics.findIndex(t => t.id === topicId);
     return index >= 0 ? TOPIC_COLORS[index % TOPIC_COLORS.length] : '#888';
   };

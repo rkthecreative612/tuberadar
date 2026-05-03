@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import supabase from '../lib/supabase';
 
@@ -10,7 +10,30 @@ const AddChannel = () => {
   ]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [usedColors, setUsedColors] = useState([]);
+  const [selectedColor, setSelectedColor] = useState(null);
   const navigate = useNavigate();
+
+  const COLOR_PALETTE = [
+    '#ef4444', '#22c55e', '#3b82f6', '#a855f7', '#f59e0b', '#06b6d4',
+    '#ec4899', '#8b5cf6', '#10b981', '#6366f1', '#f43f5e', '#14b8a6'
+  ];
+
+  useEffect(() => {
+    const fetchUsedColors = async () => {
+      const { data } = await supabase.from('my_channels').select('color');
+      if (data) {
+        const colors = data.map(c => c.color).filter(Boolean);
+        setUsedColors(colors);
+        // Set first available color
+        const firstAvailable = COLOR_PALETTE.find(c => !colors.includes(c));
+        setSelectedColor(firstAvailable || COLOR_PALETTE[0]);
+      } else {
+        setSelectedColor(COLOR_PALETTE[0]);
+      }
+    };
+    fetchUsedColors();
+  }, []);
 
   const containerStyle = {
     display: 'flex',
@@ -84,6 +107,29 @@ const AddChannel = () => {
     outline: 'none'
   };
 
+  const colorPickerContainerStyle = {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: '10px',
+    marginTop: '5px'
+  };
+
+  const colorOptionStyle = (color, isUsed, isSelected) => ({
+    width: '36px',
+    height: '36px',
+    borderRadius: '50%',
+    backgroundColor: color,
+    cursor: isUsed ? 'not-allowed' : 'pointer',
+    opacity: isUsed ? 0.3 : 1,
+    border: isSelected ? '3px solid white' : 'none',
+    boxSizing: 'border-box',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+    transition: 'transform 0.2s'
+  });
+
   const sectionDividerStyle = {
     height: '1px',
     backgroundColor: '#333',
@@ -152,13 +198,13 @@ const AddChannel = () => {
     setLoading(true);
     setError(null);
 
-    // Save to my_channels: id, name, description, created_at
-    // we use description for channelUrl
+    // Save to my_channels: id, name, description, color, created_at
     const { data: myChannelData, error: myChannelError } = await supabase
       .from('my_channels')
       .insert({
         name: channelName,
-        description: channelUrl
+        description: channelUrl,
+        color: selectedColor
       })
       .select()
       .single();
@@ -197,7 +243,7 @@ const AddChannel = () => {
     }
 
     setLoading(false);
-    navigate('/');
+    navigate('/home');
   };
 
   return (
@@ -228,6 +274,30 @@ const AddChannel = () => {
             value={channelUrl}
             onChange={(e) => setChannelUrl(e.target.value)}
           />
+        </div>
+
+        <div style={inputGroupStyle}>
+          <label style={labelStyle}>Pick Topic Color</label>
+          <div style={colorPickerContainerStyle}>
+            {COLOR_PALETTE.map(color => {
+              const isUsed = usedColors.includes(color);
+              const isSelected = selectedColor === color;
+              return (
+                <div 
+                  key={color} 
+                  style={colorOptionStyle(color, isUsed, isSelected)}
+                  onClick={() => !isUsed && setSelectedColor(color)}
+                  title={isUsed ? 'Color already in use' : color}
+                >
+                  {isSelected && <span style={{ color: 'white', fontWeight: 'bold', fontSize: '18px' }}>✓</span>}
+                  {isUsed && <span style={{ position: 'absolute', top: '-5px', right: '-5px', background: '#333', borderRadius: '50%', padding: '2px', fontSize: '10px' }}>🔒</span>}
+                </div>
+              );
+            })}
+          </div>
+          <span style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>
+            Unique colors help you distinguish topics across the app.
+          </span>
         </div>
 
         <div style={sectionDividerStyle}></div>

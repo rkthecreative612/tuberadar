@@ -10,6 +10,7 @@ function TopicRevenueDetail() {
   
   // States
   const [topicName, setTopicName] = useState('')
+  const [topicColor, setTopicColor] = useState('#22c55e')
   const [year, setYear] = useState(new Date().getFullYear())
   const [currency, setCurrency] = useState('USD')
   const [exchangeRate, setExchangeRate] = useState(1)
@@ -21,11 +22,14 @@ function TopicRevenueDetail() {
   const currentMonthName = months[new Date().getMonth()]
   const isCurrentYear = year === new Date().getFullYear()
 
-  // Fetch Topic Name
+  // Fetch Topic Info
   useEffect(() => {
     const fetchTopic = async () => {
-      const { data } = await supabase.from('my_channels').select('name').eq('id', channelId).single()
-      if (data) setTopicName(data.name)
+      const { data } = await supabase.from('my_channels').select('name, color').eq('id', channelId).single()
+      if (data) {
+        setTopicName(data.name)
+        setTopicColor(data.color || '#22c55e')
+      }
     }
     fetchTopic()
   }, [channelId])
@@ -336,7 +340,7 @@ function TopicRevenueDetail() {
           <button style={backButtonStyle} onClick={() => navigate('/revenue')}>
             <span>◄</span> Back
           </button>
-          <h2 style={{ margin: 0 }}>Topic: <span style={{ color: '#22c55e' }}>{topicName}</span></h2>
+          <h2 style={{ margin: 0 }}>Topic: <span style={{ color: topicColor }}>{topicName}</span></h2>
         </div>
 
         <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>

@@ -271,10 +271,16 @@ function RevenueTracker() {
     overflow: 'hidden',
   }
 
-  const rowStyle = (checked) => ({
+  const COLOR_PALETTE = [
+    '#ef4444', '#22c55e', '#3b82f6', '#a855f7', '#f59e0b', '#06b6d4',
+    '#ec4899', '#8b5cf6', '#10b981', '#6366f1', '#f43f5e', '#14b8a6'
+  ];
+
+  const rowStyle = (checked, color) => ({
     display: 'grid',
     gridTemplateColumns: '200px repeat(12, 1fr) 100px',
     borderBottom: '1px solid #333',
+    borderLeft: color ? `4px solid ${color}` : 'none',
     opacity: checked ? 1 : 0.4,
     background: checked ? 'transparent' : '#0a0a0a',
   })
@@ -353,7 +359,7 @@ function RevenueTracker() {
 
       <div style={tableContainerStyle}>
         {/* Header Row */}
-        <div style={{ ...rowStyle(true), background: '#222', fontWeight: 'bold' }}>
+        <div style={{ ...rowStyle(true, null), background: '#222', fontWeight: 'bold' }}>
           <div style={{ ...cellStyle, justifyContent: 'flex-start' }}>TOPIC</div>
           {months.map((m, idx) => (
             <div 
@@ -373,10 +379,11 @@ function RevenueTracker() {
         </div>
 
         {/* Data Rows */}
-        {channels.map(ch => {
+        {channels.map((ch, index) => {
           const checked = checkedTopics.has(ch.id)
+          const color = ch.color || COLOR_PALETTE[index % COLOR_PALETTE.length]
           return (
-            <div key={ch.id} style={rowStyle(checked)}>
+            <div key={ch.id} style={rowStyle(checked, color)}>
               <div style={{ ...cellStyle, justifyContent: 'flex-start', gap: '10px' }}>
                 <input 
                   type="checkbox" 
@@ -437,7 +444,7 @@ function RevenueTracker() {
         })}
 
         {/* Bottom Total Row */}
-        <div style={{ ...rowStyle(true), background: '#222', fontWeight: 'bold' }}>
+        <div style={{ ...rowStyle(true, null), background: '#222', fontWeight: 'bold' }}>
           <div style={{ ...cellStyle, justifyContent: 'flex-start' }}>TOTAL</div>
           {months.map((m, idx) => {
             const totalForMonth = channels

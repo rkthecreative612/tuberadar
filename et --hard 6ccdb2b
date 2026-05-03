@@ -1,0 +1,16 @@
+[33m6ccd2b4[m[33m ([m[1;36mHEAD[m[33m, [m[1;32mmaster[m[33m)[m Feature: Revenue Tracker - Complete with edit/delete/add sections
+[33m1245dae[m checkpont sunday
+[33mc02bedb[m code before dashboard
+[33m0f72c74[m good till scheduler
+[33m66dfdc5[m Scheduler Phase 1 - Calendar, Drag-Drop, Schedule Modal working
+[33mad2fba0[m Checkpoint: Before adding color palette system
+[33m3648180[m Fixed: View modal working - smooth editing, no shaking
+[33m76b1531[m planner checkpoint
+[33m7398471[m thumbnail and title click to YouTube working
+[33m0d0b92b[m two phase fetch, remove button, section labels working
+[33m604fcda[m full restructure working - competitor dashboard with stats
+[33maa0e6d2[m current progress saved before restructure
+[33m5b8d963[m real views, scores, time ago, shorts filter, channel switching
+[33m8ec42e6[m real youtube data working
+[33md17e7d4[m dashboard UI complete - sidebar and main feed
+[33mc2d70ae[m first commit - project created

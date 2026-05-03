@@ -86,11 +86,11 @@ const BrainstormTopic = ({ topic: topicProp }) => {
 
   const [ideaTitle, setIdeaTitle] = useState('');
   const [ideaDescription, setIdeaDescription] = useState('');
-  const [plannerErrors, setPlannerErrors] = useState({ title: '', description: '' });
   const [boundVideos, setBoundVideos] = useState([]);
   const [showBindDropdown, setShowBindDropdown] = useState(false);
   const [showPlannerSuccess, setShowPlannerSuccess] = useState(false);
   const [showScheduleSuccess, setShowScheduleSuccess] = useState(false);
+  const [toast, setToast] = useState(null); // { text, kind }
 
   useEffect(() => {
     if (topicProp) return;
@@ -245,13 +245,11 @@ const BrainstormTopic = ({ topic: topicProp }) => {
     const activeTopicId = topic?.id || topicId;
     if (!activeTopicId) return;
 
-    const nextErrors = {
-      title: ideaTitle.trim() ? '' : 'Title is required',
-      description: ideaDescription.trim() ? '' : 'Description is required',
-    };
-
-    setPlannerErrors(nextErrors);
-    if (nextErrors.title || nextErrors.description) return;
+    if (!ideaTitle.trim()) {
+      setToast({ text: '❌ Title required', kind: 'error' });
+      setTimeout(() => setToast(null), 3000);
+      return;
+    }
 
     try {
       const binded = (boundVideos || []).map((v) => {
@@ -287,7 +285,6 @@ const BrainstormTopic = ({ topic: topicProp }) => {
       setTimeout(() => setShowPlannerSuccess(false), 3000);
       setIdeaTitle('');
       setIdeaDescription('');
-      setPlannerErrors({ title: '', description: '' });
       setBoundVideos(remainingVideos.length > 0 ? [remainingVideos[0]] : []);
     } catch (err) {
       console.error('Error moving to planner:', err);
@@ -300,13 +297,11 @@ const BrainstormTopic = ({ topic: topicProp }) => {
     const activeTopicId = topic?.id || topicId;
     if (!activeTopicId) return;
 
-    const nextErrors = {
-      title: ideaTitle.trim() ? '' : 'Title is required',
-      description: ideaDescription.trim() ? '' : 'Description is required',
-    };
-
-    setPlannerErrors(nextErrors);
-    if (nextErrors.title || nextErrors.description) return;
+    if (!ideaTitle.trim()) {
+      setToast({ text: '❌ Title required', kind: 'error' });
+      setTimeout(() => setToast(null), 3000);
+      return;
+    }
 
     try {
       const [year, month, day] = selectedDate.split('-').map(Number);
@@ -352,7 +347,6 @@ const BrainstormTopic = ({ topic: topicProp }) => {
       setTimeout(() => setShowScheduleSuccess(false), 3000);
       setIdeaTitle('');
       setIdeaDescription('');
-      setPlannerErrors({ title: '', description: '' });
       setBoundVideos(remainingVideos.length > 0 ? [remainingVideos[0]] : []);
     } catch (err) {
       console.error('Error scheduling video:', err);
@@ -394,7 +388,7 @@ const BrainstormTopic = ({ topic: topicProp }) => {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
           <button
             onClick={() => navigate('/brainstorm')}
-            style={{ background: 'transparent', border: 'none', color: '#ccc', cursor: 'pointer', fontSize: '14px', fontWeight: 'bold' }}
+            style={{ background: 'transparent', border: 'none', color: topic?.color || '#ccc', cursor: 'pointer', fontSize: '14px', fontWeight: 'bold' }}
           >
             &larr; Back to Brainstormer
           </button>
@@ -459,16 +453,10 @@ const BrainstormTopic = ({ topic: topicProp }) => {
             value={ideaTitle}
             onChange={(e) => {
               setIdeaTitle(e.target.value);
-              if (plannerErrors.title) setPlannerErrors((p) => ({ ...p, title: '' }));
             }}
             placeholder="Write your video title idea..."
             style={{ width: '100%', height: '60px', background: '#1a1a1a', border: '1px solid #333', color: 'white', borderRadius: '8px', padding: '10px', boxSizing: 'border-box', fontFamily: 'sans-serif', resize: 'none' }}
           />
-          {plannerErrors.title ? (
-            <div style={{ color: '#ef4444', fontSize: '12px', marginTop: '6px' }}>
-              {plannerErrors.title}
-            </div>
-          ) : null}
         </div>
 
         <div>
@@ -477,16 +465,10 @@ const BrainstormTopic = ({ topic: topicProp }) => {
             value={ideaDescription}
             onChange={(e) => {
               setIdeaDescription(e.target.value);
-              if (plannerErrors.description) setPlannerErrors((p) => ({ ...p, description: '' }));
             }}
             placeholder="Write your description idea..."
             style={{ width: '100%', height: '120px', background: '#1a1a1a', border: '1px solid #333', color: 'white', borderRadius: '8px', padding: '10px', boxSizing: 'border-box', fontFamily: 'sans-serif', resize: 'none' }}
           />
-          {plannerErrors.description ? (
-            <div style={{ color: '#ef4444', fontSize: '12px', marginTop: '6px' }}>
-              {plannerErrors.description}
-            </div>
-          ) : null}
         </div>
 
         <div>
@@ -563,6 +545,22 @@ const BrainstormTopic = ({ topic: topicProp }) => {
           )}
         </div>
       </div>
+      {toast && (
+        <div style={{
+          position: 'fixed',
+          bottom: '24px',
+          right: '24px',
+          padding: '12px 24px',
+          borderRadius: '8px',
+          backgroundColor: toast.kind === 'error' ? '#ef4444' : '#22c55e',
+          color: '#fff',
+          fontWeight: '700',
+          boxShadow: '0 8px 16px rgba(0,0,0,0.5)',
+          zIndex: 3000,
+        }}>
+          {toast.text}
+        </div>
+      )}
     </div>
   );
 };

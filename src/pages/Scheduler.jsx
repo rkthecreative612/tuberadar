@@ -28,7 +28,10 @@ const dateStringToDate = (dateStr) => {
   return new Date(year, month - 1, day, 12, 0, 0, 0);
 };
 
-const TOPIC_COLORS = ['#ef4444', '#22c55e', '#3b82f6'];
+const TOPIC_COLORS = [
+  '#ef4444', '#22c55e', '#3b82f6', '#a855f7', '#f59e0b', '#06b6d4',
+  '#ec4899', '#8b5cf6', '#10b981', '#6366f1', '#f43f5e', '#14b8a6'
+];
 
 const Scheduler = () => {
   const now = new Date();
@@ -133,12 +136,13 @@ const Scheduler = () => {
   };
 
   const handleAddVideoClick = () => {
-    const errors = {};
-    if (!addForm.title.trim()) errors.title = 'Title is required';
-    if (!addForm.topic_id) errors.topic = 'Topic is required';
-
-    if (Object.keys(errors).length > 0) {
-      setAddErrors(errors);
+    if (!addForm.title.trim()) {
+      setToast({ text: '❌ Title required', kind: 'error' });
+      setTimeout(() => setToast(null), 3000);
+      return;
+    }
+    if (!addForm.topic_id) {
+      setAddErrors({ topic: 'Topic is required' });
       return;
     }
     setAddErrors({});
@@ -207,7 +211,7 @@ const Scheduler = () => {
   const topicColorMap = useMemo(() => {
     const map = {};
     channels.forEach((channel, index) => {
-      map[channel.id] = TOPIC_COLORS[index % TOPIC_COLORS.length];
+      map[channel.id] = channel.color || TOPIC_COLORS[index % TOPIC_COLORS.length];
     });
     return map;
   }, [channels]);
@@ -674,12 +678,11 @@ const Scheduler = () => {
                   autoFocus
                   maxLength={100}
                   placeholder="Video Title..."
-                  style={{ width: '100%', backgroundColor: '#1a1a1a', color: '#fff', border: `1px solid ${addErrors.title ? '#ef4444' : '#333'}`, borderRadius: '8px', padding: '12px', outline: 'none' }}
+                  style={{ width: '100%', backgroundColor: '#1a1a1a', color: '#fff', border: '1px solid #333', borderRadius: '8px', padding: '12px', outline: 'none' }}
                   value={addForm.title}
                   onChange={(e) => setAddForm({ ...addForm, title: e.target.value })}
                 />
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '4px' }}>
-                  <span style={{ color: '#ef4444', fontSize: '11px' }}>{addErrors.title}</span>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '4px' }}>
                   <span style={{ color: '#555', fontSize: '11px' }}>{addForm.title.length}/100</span>
                 </div>
               </div>

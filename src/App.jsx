@@ -9,7 +9,7 @@ import Brainstorm from './pages/Brainstorm'
 import BrainstormTopic from './pages/BrainstormTopic'
 import Planner from './pages/Planner'
 import Dashboard from './pages/Dashboard'
-import Stats from './pages/Stats'
+
 import RevenueTracker from './pages/RevenueTracker'
 import Scheduler from './pages/Scheduler'
 import Status from './pages/Status'
@@ -17,7 +17,6 @@ import DeletedVideos from './pages/DeletedVideos'
 import SmartSearch from './pages/SmartSearch'
 import Landing from './pages/Landing'
 import CompletedVideos from './pages/CompletedVideos'
-import AISummary from './pages/AISummary'
 import TopicRevenueDetail from './pages/TopicRevenueDetail'
 import { deleteOldDeletedVideos } from './lib/autoDeleteOldVideos'
 
@@ -65,11 +64,12 @@ function App() {
 
     <Routes>
       <Route element={<AppLayout />}>
-        <Route path="/" element={<Home />} />
+        <Route path="/" element={<Landing />} />
+        <Route path="/home" element={<Home />} />
         <Route path="/landing" element={<Landing />} />
         <Route path="/add-channel" element={<AddChannel />} />
-        <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/dashboard/:channelId" element={<Dashboard />} />
+
+        <Route path="/home/:channelId" element={<Dashboard />} />
         <Route path="/brainstorm" element={<Brainstorm />} />
         <Route path="/brainstorm/:topicId" element={<BrainstormTopic />} />
         <Route path="/planner" element={<Planner />} />
@@ -78,9 +78,8 @@ function App() {
         <Route path="/deleted-videos" element={<DeletedVideos />} />
         <Route path="/completed-videos" element={<CompletedVideos />} />
         <Route path="/smart-search" element={<SmartSearch />} />
-        <Route path="/ai-summary" element={<AISummary />} />
 
-        <Route path="/stats" element={<Stats />} />
+
 
         <Route path="/revenue" element={<RevenueTracker />} />
         <Route path="/topic-revenue/:channelId" element={<TopicRevenueDetail />} />

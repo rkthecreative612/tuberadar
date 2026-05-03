@@ -61,6 +61,11 @@ const COLORS = {
   warning: '#ff9800',
 }
 
+const COLOR_PALETTE = [
+  '#ef4444', '#22c55e', '#3b82f6', '#a855f7', '#f59e0b', '#06b6d4',
+  '#ec4899', '#8b5cf6', '#10b981', '#6366f1', '#f43f5e', '#14b8a6'
+];
+
 function Planner() {
   const navigate = useNavigate()
 
@@ -121,12 +126,11 @@ function Planner() {
     const title = addForm.title.trim()
     const description = addForm.description.trim()
 
-    const next = {
-      title: title ? '' : 'Title is required',
-      description: description ? '' : 'Description is required',
+    if (!title) {
+      setToast({ kind: 'error', text: '❌ Title required' })
+      setTimeout(() => setToast(null), 3000)
+      return
     }
-    setAddErrors(next)
-    if (next.title || next.description) return
 
     const topic = addModal.topic
     if (!topic?.id) return
@@ -185,12 +189,11 @@ function Planner() {
     const title = addForm.title.trim()
     const description = addForm.description.trim()
 
-    const next = {
-      title: title ? '' : 'Title is required',
-      description: description ? '' : 'Description is required',
+    if (!title) {
+      setToast({ kind: 'error', text: '❌ Title required' })
+      setTimeout(() => setToast(null), 3000)
+      return
     }
-    setAddErrors(next)
-    if (next.title || next.description) return
 
     const topic = addModal.topic
     if (!topic?.id) return
@@ -307,15 +310,16 @@ function Planner() {
     gap: '16px',
   }
 
-  const colStyle = {
+  const colStyle = (color) => ({
     backgroundColor: COLORS.bgMain,
     border: `1px solid ${COLORS.borderDefault}`,
+    borderTop: `4px solid ${color}`,
     borderRadius: '8px',
     overflow: 'hidden',
     minHeight: '160px',
     display: 'flex',
     flexDirection: 'column',
-  }
+  })
 
   const colHeaderStyle = {
     display: 'flex',
@@ -562,12 +566,12 @@ function Planner() {
         <div className="plannerGrid" style={gridStyle}>
           {topicRows.map((row) => (
             <div key={row.map((t) => t.id).join('-')} className="plannerRow" style={rowStyle}>
-              {row.map((t) => {
+              {row.map((t, index) => {
                 const rows = byTopic[t.id] || []
                 const ids = rows.map((r) => r.id)
 
                 return (
-                  <section key={t.id} className="plannerColumn" style={colStyle}>
+                  <section key={t.id} className="plannerColumn" style={colStyle(t.color || COLOR_PALETTE[index % COLOR_PALETTE.length])}>
                     <div style={colHeaderStyle}>
                       <h2 style={colTitleStyle}>{t.name || 'Untitled Topic'}</h2>
                       <button
@@ -682,12 +686,8 @@ function Planner() {
                   value={addForm.description}
                   onChange={(e) => {
                     setAddForm((p) => ({ ...p, description: e.target.value }))
-                    if (addErrors.description) setAddErrors((p) => ({ ...p, description: '' }))
                   }}
                 />
-                {addErrors.description ? (
-                  <div style={{ color: COLORS.textError, fontSize: '12px', marginTop: '6px' }}>{addErrors.description}</div>
-                ) : null}
               </div>
 
               <div>
@@ -741,12 +741,9 @@ function Planner() {
                 type="button" 
                 onClick={() => {
                   const title = addForm.title.trim()
-                  const description = addForm.description.trim()
-                  if (!title || !description) {
-                    setAddErrors({
-                      title: title ? '' : 'Title is required',
-                      description: description ? '' : 'Description is required',
-                    })
+                  if (!title) {
+                    setToast({ kind: 'error', text: '❌ Title required' })
+                    setTimeout(() => setToast(null), 3000)
                     return
                   }
                   dateInputRef.current.showPicker?.() || dateInputRef.current.click()

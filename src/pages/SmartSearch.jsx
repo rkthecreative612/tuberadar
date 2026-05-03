@@ -19,7 +19,7 @@ export default function SmartSearch() {
     const fetchTopics = async () => {
       const { data } = await supabase
         .from('my_channels')
-        .select('id, name')
+        .select('id, name, color')
         .order('created_at', { ascending: false });
       
       if (data) {
@@ -196,9 +196,15 @@ export default function SmartSearch() {
     }
   };
 
-  // Color cycling for topics
-  const topicColors = ['#ef4444', '#22c55e', '#3b82f6'];
-  const getTopicColor = (index) => topicColors[index % topicColors.length];
+  const topicColors = [
+    '#ef4444', '#22c55e', '#3b82f6', '#a855f7', '#f59e0b', '#06b6d4',
+    '#ec4899', '#8b5cf6', '#10b981', '#6366f1', '#f43f5e', '#14b8a6'
+  ];
+  const getTopicColor = (topic) => {
+    if (topic && topic.color) return topic.color;
+    const index = allTopics.findIndex(t => t.id === topic?.id);
+    return topicColors[index % topicColors.length];
+  };
 
   // Styles
 
@@ -541,7 +547,7 @@ export default function SmartSearch() {
               onChange={() => toggleTopic(topic.id)}
               style={checkboxStyle}
             />
-            <span style={colorDotStyle} style={{...colorDotStyle, backgroundColor: getTopicColor(idx)}}></span>
+            <span style={colorDotStyle} style={{...colorDotStyle, backgroundColor: getTopicColor(topic)}}></span>
             {topic.name}
           </label>
         ))}
@@ -569,9 +575,9 @@ export default function SmartSearch() {
 
         {!loading && isSearched && Object.keys(results).length > 0 && (
           Object.entries(results).map(([topicId, channels]) => {
-            const topicName = allTopics.find(t => t.id === topicId)?.name;
-            const topicIdx = allTopics.findIndex(t => t.id === topicId);
-            const topicColor = getTopicColor(topicIdx);
+            const topic = allTopics.find(t => t.id === topicId);
+            const topicName = topic?.name;
+            const topicColor = getTopicColor(topic);
 
             return (
               <div key={topicId}>

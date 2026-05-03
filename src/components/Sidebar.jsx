@@ -111,16 +111,15 @@ function Sidebar() {
       <nav style={navStyle} aria-label="Navigation">
         <Item to="/landing" label="Landing" />
         <Item to="/completed-videos" label="Completed" />
-        <Item to="/dashboard" label="Dashboard" end />
-        <Item to="/" label="Home" end />
+
+        <Item to="/home" label="Home" end />
         <Item to="/brainstorm" label="Brainstorm" />
         <Item to="/planner" label="Planner" />
         <Item to="/scheduler" label="Scheduler" />
         <Item to="/status" label="Status" />
         <Item to="/smart-search" label="Smart Search" />
-        <Item to="/ai-summary" label="AI Summary" />
         <Item to="/deleted-videos" label="Deleted Videos" />
-        <Item to="/stats" label="Stats" />
+
 
         <Item to="/revenue" label="Revenue tracker" />
       </nav>

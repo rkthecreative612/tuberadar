@@ -610,7 +610,7 @@ function MainDashboard({ selectedMyChannel, onBackClick }) {
                 &larr; Back
               </button>
             )}
-            <h1 style={topTitleStyle}>{selectedMyChannel?.name || 'Dashboard'}</h1>
+            <h1 style={{ ...topTitleStyle, color: selectedMyChannel?.color || '#fff' }}>{selectedMyChannel?.name || 'Dashboard'}</h1>
           </div>
           
           <div style={topBarRightStyle}>
