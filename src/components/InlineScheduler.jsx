@@ -103,11 +103,9 @@ const InlineScheduler = ({ video, onSave, onCancel }) => {
   return (
     <div style={{
       width: '100%',
-      maxWidth: '300px',
       backgroundColor: '#111',
       borderRadius: '8px',
       border: `1px solid ${COLORS.border}`,
-      marginTop: '10px',
       padding: '12px',
       display: 'flex',
       flexDirection: 'column',

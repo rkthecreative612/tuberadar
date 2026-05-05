@@ -12,32 +12,42 @@ const containerStyle = {
 };
 
 const titleStyle = {
-  fontSize: '28px',
-  fontWeight: 'bold',
-  color: 'white',
+  fontSize: '46px',
+  fontWeight: '800',
+  fontFamily: "'Outfit', 'Inter', 'Segoe UI', sans-serif",
   textAlign: 'center',
-  padding: '32px 0',
-  margin: 0
+  padding: '40px 0',
+  margin: 0,
+  background: 'linear-gradient(135deg, #ffffff 0%, #a0a0a0 100%)',
+  WebkitBackgroundClip: 'text',
+  WebkitTextFillColor: 'transparent',
+  letterSpacing: '3px',
+  textShadow: '0 4px 24px rgba(255, 255, 255, 0.1)'
 };
 
 const gridStyle = {
   display: 'grid',
   gridTemplateColumns: 'repeat(3, 1fr)',
-  gap: '20px',
+  gap: '24px',
   padding: '24px',
   maxWidth: '1200px',
   margin: '0 auto'
 };
 
 const cardStyle = {
-  backgroundColor: '#1a1a1a',
-  borderRadius: '12px',
-  padding: '20px',
-  minHeight: '160px',
+  backgroundColor: 'rgba(26, 26, 26, 0.5)',
+  borderRadius: '16px',
+  padding: '24px',
+  minHeight: '180px',
   display: 'flex',
   flexDirection: 'column',
   boxSizing: 'border-box',
-  position: 'relative'
+  position: 'relative',
+  backdropFilter: 'blur(16px)',
+  WebkitBackdropFilter: 'blur(16px)',
+  transition: 'all 0.5s cubic-bezier(0.4, 0, 0.2, 1)',
+  border: '1px solid rgba(255, 255, 255, 0.05)',
+  animation: 'breathe 4s ease-in-out infinite'
 };
 
 const topicNameStyle = {
@@ -169,30 +179,66 @@ const Brainstorm = () => {
 
   return (
     <div style={containerStyle}>
-      <h1 style={titleStyle}>BRAINSTORMER</h1>
+      <style>{`
+        @keyframes breathe {
+          0% { 
+            box-shadow: 0 0 15px var(--glow-low), inset 0 0 10px var(--glow-inner); 
+            border-color: var(--border-low);
+          }
+          50% { 
+            box-shadow: 0 0 35px var(--glow-high), inset 0 0 20px var(--glow-inner-bright); 
+            border-color: var(--border-high);
+          }
+          100% { 
+            box-shadow: 0 0 15px var(--glow-low), inset 0 0 10px var(--glow-inner); 
+            border-color: var(--border-low);
+          }
+        }
+        .topic-card:hover {
+          transform: translateY(-8px) scale(1.02);
+          filter: brightness(1.1);
+        }
+      `}</style>
+      <h1 style={titleStyle}>BRAINSTORM</h1>
       
       <div style={gridStyle}>
-        {topics.map(topic => (
-          <div key={topic.id} style={cardStyle}>
-            <h2 style={topicNameStyle}>{topic.name}</h2>
-            <p style={countStyle}>No of videos: {counts[topic.id] || 0}</p>
-            
-            <div style={buttonRowStyle}>
-              <button 
-                style={openButtonStyle}
-                onClick={() => navigate(`/brainstorm/${topic.id}`)}
-              >
-                Open
-              </button>
-              <button 
-                style={actionButtonStyle}
-                onClick={() => setShowModal(true)}
-              >
-                Delete
-              </button>
+        {topics.map(topic => {
+          const topicColor = topic.color || '#555555';
+          return (
+            <div 
+              key={topic.id} 
+              className="topic-card"
+              style={{
+                ...cardStyle,
+                backgroundColor: `${topicColor}0D`, 
+                '--glow-low': `${topicColor}22`,
+                '--glow-high': `${topicColor}99`,
+                '--glow-inner': `${topicColor}0D`,
+                '--glow-inner-bright': `${topicColor}22`,
+                '--border-low': `${topicColor}33`,
+                '--border-high': `${topicColor}FF`,
+              }}
+            >
+              <h2 style={topicNameStyle}>{topic.name}</h2>
+              <p style={countStyle}>No of videos: {counts[topic.id] || 0}</p>
+              
+              <div style={buttonRowStyle}>
+                <button 
+                  style={openButtonStyle}
+                  onClick={() => navigate(`/brainstorm/${topic.id}`)}
+                >
+                  Open
+                </button>
+                <button 
+                  style={actionButtonStyle}
+                  onClick={() => setShowModal(true)}
+                >
+                  Delete
+                </button>
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
         
         <div style={plusCardStyle} title="Auto-created with topics">
           <span style={plusIconStyle}>+</span>

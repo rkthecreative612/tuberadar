@@ -26,6 +26,56 @@ const scrollbarStyles = `
   ::-webkit-scrollbar-thumb:hover {
     background: #555;
   }
+  .plannerCard {
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  }
+  .plannerCard:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 12px 24px rgba(0,0,0,0.6) !important;
+  }
+  .plannerCard:active {
+    cursor: grabbing;
+  }
+  .addBtn:hover {
+    background-color: rgba(255,255,255,0.2) !important;
+    transform: scale(1.1);
+  }
+  .plannerCard {
+    position: relative !important;
+    z-index: 1 !important;
+    overflow: hidden !important;
+  }
+  .plannerCard::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 0;
+    height: 100%;
+    background: var(--topic-color);
+    opacity: 0;
+    transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease;
+    z-index: -1;
+    pointer-events: none;
+  }
+  .plannerCard:hover::before {
+    width: 100%;
+    opacity: 0.7;
+  }
+  .plannerCard:hover h3 {
+    color: #fff !important;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.6);
+  }
+  .plannerCard button {
+    transition: all 0.2s ease !important;
+  }
+  .plannerCard button:hover {
+    filter: brightness(1.1);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  }
+  .plannerCard button:active {
+    transform: scale(0.96);
+  }
 `;
 
 const COLORS = {
@@ -289,18 +339,18 @@ function Planner() {
   const pageStyle = {
     height: '100%',
     overflowY: 'auto',
-    backgroundColor: COLORS.bgMain,
-    padding: '22px',
+    background: 'radial-gradient(circle at 20% 20%, #161616 0%, #050505 100%)',
+    padding: '30px',
     boxSizing: 'border-box',
     color: COLORS.textPrimary,
-    fontFamily: 'system-ui, sans-serif',
+    fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
   }
 
   const gridStyle = {
     display: 'flex',
     flexDirection: 'column',
-    gap: '20px',
-    maxWidth: '1400px',
+    gap: '24px',
+    maxWidth: '1600px',
     margin: '0 auto',
   }
 
@@ -311,45 +361,53 @@ function Planner() {
   }
 
   const colStyle = (color) => ({
-    backgroundColor: COLORS.bgMain,
-    border: `1px solid ${COLORS.borderDefault}`,
-    borderTop: `4px solid ${color}`,
-    borderRadius: '8px',
+    backgroundColor: '#0f0f0f',
+    border: `1px solid rgba(255,255,255,0.05)`,
+    borderRadius: '16px',
     overflow: 'hidden',
-    minHeight: '160px',
+    minHeight: '180px',
     display: 'flex',
     flexDirection: 'column',
+    boxShadow: '0 12px 40px rgba(0,0,0,0.5)',
   })
 
-  const colHeaderStyle = {
+  const colHeaderStyle = (topicColor) => ({
     display: 'flex',
     alignItems: 'center',
-    gap: '10px',
-    padding: '12px 12px',
-    borderBottom: `1px solid ${COLORS.borderDefault}`,
-    backgroundColor: COLORS.bgMain,
-  }
+    gap: '12px',
+    padding: '16px',
+    borderBottom: `2px solid ${topicColor}`,
+    boxShadow: `0 4px 16px ${topicColor}40, inset 0 -2px 8px ${topicColor}20`,
+    background: `linear-gradient(180deg, ${topicColor}15 0%, rgba(0,0,0,0) 100%)`,
+    borderRadius: '8px',
+    margin: '12px 12px 0 12px',
+  })
 
   const colTitleStyle = {
     margin: 0,
-    fontSize: '12px',
-    fontWeight: 800,
-    letterSpacing: '0.02em',
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-    whiteSpace: 'nowrap',
+    fontSize: '13px',
+    fontWeight: 900,
+    textTransform: 'uppercase',
+    letterSpacing: '0.08em',
+    color: '#fff',
+    opacity: 0.9,
   }
 
   const colAddStyle = {
     marginLeft: 'auto',
-    width: '28px',
-    height: '28px',
-    borderRadius: '8px',
-    border: `1px solid ${COLORS.borderDefault}`,
-    backgroundColor: COLORS.textPrimary,
-    color: COLORS.buttonTextPrimary,
+    width: '24px',
+    height: '24px',
+    borderRadius: '6px',
+    border: 'none',
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    color: '#fff',
     cursor: 'pointer',
     fontWeight: 900,
+    fontSize: '16px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    transition: 'all 0.2s',
   }
 
   const colBodyStyle = {
@@ -359,14 +417,26 @@ function Planner() {
     gap: '8px',
   }
 
-  const cardStyle = {
-    backgroundColor: COLORS.bgCard,
-    border: `1px solid ${COLORS.borderDefault}`,
-    borderRadius: '8px',
-    overflow: 'hidden',
-    display: 'flex',
-    flexDirection: 'column',
-    transition: 'transform 120ms ease, box-shadow 120ms ease, border-color 120ms ease',
+  const cardStyle = (topicColor, isDragging = false) => {
+    const topicColorDark = topicColor + '88';
+    return {
+      border: `2px solid transparent`,
+      backgroundImage: `linear-gradient(#1e1e1e, #1e1e1e), linear-gradient(135deg, ${topicColor}, ${topicColorDark})`,
+      backgroundOrigin: 'border-box',
+      backgroundClip: 'padding-box, border-box',
+      boxShadow: isDragging 
+        ? `0 0 40px ${topicColor}90, inset 0 0 30px ${topicColor}40` 
+        : `0 0 20px ${topicColor}30, inset 0 0 20px ${topicColor}10`,
+      borderRadius: '12px',
+      overflow: 'hidden',
+      display: 'flex',
+      flexDirection: 'column',
+      position: 'relative',
+      '--topic-color': topicColor || '#444',
+      transform: isDragging ? 'scale(1.05)' : 'scale(1)',
+      zIndex: isDragging ? 50 : 1,
+      transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+    }
   }
 
   const thumbStyle = {
@@ -377,13 +447,20 @@ function Planner() {
   }
 
   const cardBodyStyle = {
-    padding: '10px',
+    padding: '12px',
     display: 'flex',
     flexDirection: 'column',
-    gap: '10px',
+    gap: '12px',
   }
 
-  const h3Style = { margin: 0, fontSize: '12px', fontWeight: 800, lineHeight: 1.2 }
+  const h3Style = { 
+    margin: 0, 
+    fontSize: '13px', 
+    fontWeight: 700, 
+    lineHeight: 1.4,
+    color: '#eee',
+    letterSpacing: '0.01em'
+  }
 
   const fieldLabelStyle = { fontSize: '11px', color: '#9a9a9a', marginBottom: '6px' }
 
@@ -415,25 +492,26 @@ function Planner() {
 
   const actionsStyle = {
     display: 'flex',
-    gap: '8px',
-    flexWrap: 'wrap',
+    gap: '5px',
+    flexWrap: 'nowrap',
     justifyContent: 'space-between',
     marginTop: '8px',
     width: '100%',
   }
 
   const btnStyle = {
-    padding: '8px 16px',
-    borderRadius: '6px',
+    padding: '6px 4px',
+    borderRadius: '4px',
     border: `1px solid ${COLORS.borderDefault}`,
     backgroundColor: COLORS.textPrimary,
     color: COLORS.buttonTextPrimary,
     cursor: 'pointer',
     fontWeight: 700,
-    fontSize: '12px',
+    fontSize: '11px',
     transition: 'all 0.2s',
     flex: '1',
-    minWidth: '80px',
+    minWidth: '0',
+    whiteSpace: 'nowrap',
   }
 
   const btnPrimaryStyle = { ...btnStyle, backgroundColor: COLORS.bgCard, color: COLORS.textPrimary, border: '1px solid #555' }
@@ -519,10 +597,11 @@ function Planner() {
     const style = {
       transform: CSS.Transform.toString(transform),
       transition,
-      opacity: isDragging ? 0.75 : 1,
+      opacity: isDragging ? 0.9 : 1,
+      zIndex: isDragging ? 100 : 1,
     }
 
-    return <div ref={setNodeRef} style={style}>{children({ attributes, listeners, setActivatorNodeRef })}</div>
+    return <div ref={setNodeRef} style={style}>{children({ attributes, listeners, setActivatorNodeRef, isDragging })}</div>
   }
 
   async function deleteCard(topicId, id) {
@@ -562,7 +641,7 @@ function Planner() {
     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
       <style>{scrollbarStyles}</style>
       <div className="plannerPage" style={pageStyle}>
-        <div style={{ padding: '0 22px 16px 22px', fontSize: '28px', fontWeight: 'bold', color: COLORS.textPrimary }}>Content Planner</div>
+        <div style={{ padding: '0 22px 30px 22px', fontSize: '32px', fontWeight: 950, letterSpacing: '-0.03em', background: 'linear-gradient(to right, #fff, #888)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Content Planner</div>
         <div className="plannerGrid" style={gridStyle}>
           {topicRows.map((row) => (
             <div key={row.map((t) => t.id).join('-')} className="plannerRow" style={rowStyle}>
@@ -572,10 +651,11 @@ function Planner() {
 
                 return (
                   <section key={t.id} className="plannerColumn" style={colStyle(t.color || COLOR_PALETTE[index % COLOR_PALETTE.length])}>
-                    <div style={colHeaderStyle}>
+                    <div style={colHeaderStyle(t.color || COLOR_PALETTE[index % COLOR_PALETTE.length])}>
                       <h2 style={colTitleStyle}>{t.name || 'Untitled Topic'}</h2>
                       <button
                         type="button"
+                        className="addBtn"
                         style={colAddStyle}
                         title="Add"
                         onClick={() => openAddModal(t)}
@@ -603,8 +683,8 @@ function Planner() {
 
                           return (
                             <SortableCard key={v.id} topicId={t.id} v={v}>
-                              {({ attributes, listeners, setActivatorNodeRef }) => (
-                                <div className="plannerCard" style={cardStyle} {...attributes}>
+                              {({ attributes, listeners, setActivatorNodeRef, isDragging }) => (
+                                <div className="plannerCard" style={cardStyle(t.color || COLOR_PALETTE[index % COLOR_PALETTE.length], isDragging)} {...attributes}>
                                   {thumbUrl ? <img src={thumbUrl} alt="" style={thumbStyle} /> : null}
 
                                   <div style={cardBodyStyle}>
@@ -946,8 +1026,8 @@ function Planner() {
               backgroundColor: COLORS.bgModal,
               border: `1px solid ${COLORS.borderDefault}`,
               borderRadius: '12px',
-              padding: '20px',
-              maxWidth: '500px',
+              padding: '10px',
+              maxWidth: '340px',
               width: '100%',
               maxHeight: '90vh',
               overflowY: 'auto',
