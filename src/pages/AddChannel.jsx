@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import supabase from '../lib/supabase';
 
 const AddChannel = () => {
+  const COLOR_PALETTE = ['#ef4444', '#22c55e', '#3b82f6', '#f59e0b', '#8b5cf6', '#ec4899'];
+  const [selectedColor, setSelectedColor] = useState(COLOR_PALETTE[0]);
   const [channelName, setChannelName] = useState('');
   const [channelUrl, setChannelUrl] = useState('');
   const [competitors, setCompetitors] = useState([
@@ -11,13 +13,10 @@ const AddChannel = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [usedColors, setUsedColors] = useState([]);
-  const [selectedColor, setSelectedColor] = useState(null);
+  const [iconValue, setIconValue] = useState('🎬');
   const navigate = useNavigate();
 
-  const COLOR_PALETTE = [
-    '#ef4444', '#22c55e', '#3b82f6', '#a855f7', '#f59e0b', '#06b6d4',
-    '#ec4899', '#8b5cf6', '#10b981', '#6366f1', '#f43f5e', '#14b8a6'
-  ];
+  const EMOJIS = ['🎬', '🎵', '🎮', '📚', '🍕', '💪', '🛍️', '✈️', '🎨', '💼', '🏠', '❤️'];
 
   useEffect(() => {
     const fetchUsedColors = async () => {
@@ -195,16 +194,24 @@ const AddChannel = () => {
       setError('Your Channel Name is required');
       return;
     }
+
+    const validCompetitors = competitors.filter(c => c.name.trim() || c.keywordsUrl.trim());
+    if (validCompetitors.length === 0) {
+      setError('Add at least 1 competitor URL to save');
+      return;
+    }
+
     setLoading(true);
     setError(null);
 
-    // Save to my_channels: id, name, description, color, created_at
+    // Save to my_channels: id, name, description, color, created_at, icon
     const { data: myChannelData, error: myChannelError } = await supabase
       .from('my_channels')
       .insert({
         name: channelName,
         description: channelUrl,
-        color: selectedColor
+        color: selectedColor,
+        icon: iconValue
       })
       .select()
       .single();
@@ -216,30 +223,26 @@ const AddChannel = () => {
       return;
     }
 
-    const validCompetitors = competitors.filter(c => c.name.trim() || c.keywordsUrl.trim());
-    
-    if (validCompetitors.length > 0) {
-      // competitor_channels: id, my_channel_id, name, channel_url, keywords, created_at
-      const compRows = validCompetitors.map(c => {
-        const isUrl = c.keywordsUrl.includes('youtube.com/') || c.keywordsUrl.includes('youtu.be/') || c.keywordsUrl.startsWith('@');
-        return {
-          my_channel_id: myChannelData.id,
-          name: c.name,
-          channel_url: isUrl ? c.keywordsUrl : null,
-          keywords: !isUrl ? c.keywordsUrl : null
-        };
-      });
+    // competitor_channels: id, my_channel_id, name, channel_url, keywords, created_at
+    const compRows = validCompetitors.map(c => {
+      const isUrl = c.keywordsUrl.includes('youtube.com/') || c.keywordsUrl.includes('youtu.be/') || c.keywordsUrl.startsWith('@');
+      return {
+        my_channel_id: myChannelData.id,
+        name: c.name,
+        channel_url: isUrl ? c.keywordsUrl : null,
+        keywords: !isUrl ? c.keywordsUrl : null
+      };
+    });
 
-      const { error: compError } = await supabase
-        .from('competitor_channels')
-        .insert(compRows);
+    const { error: compError } = await supabase
+      .from('competitor_channels')
+      .insert(compRows);
 
-      if (compError) {
-        console.error(compError);
-        setError('Failed to save competitor channels');
-        setLoading(false);
-        return;
-      }
+    if (compError) {
+      console.error(compError);
+      setError('Failed to save competitor channels');
+      setLoading(false);
+      return;
     }
 
     setLoading(false);
@@ -254,7 +257,7 @@ const AddChannel = () => {
       </div>
 
       <div style={formSectionStyle}>
-        {error && <div style={{ color: '#ff5252', marginBottom: '10px' }}>{error}</div>}
+        {error && <div style={{ color: '#ff5252', marginBottom: '10px', fontWeight: 'bold' }}>{error}</div>}
         
         <div style={inputGroupStyle}>
           <label style={labelStyle}>Your Channel Name</label>
@@ -265,6 +268,41 @@ const AddChannel = () => {
             onChange={(e) => setChannelName(e.target.value)}
           />
         </div>
+
+        {/* --- ICON SELECTOR SECTION --- */}
+        <div style={inputGroupStyle}>
+          <label style={labelStyle}>Channel Icon</label>
+          
+          <div style={{ 
+            display: 'flex', flexWrap: 'wrap', gap: '8px',
+            backgroundColor: '#0a0a0a', padding: '12px', borderRadius: '12px', border: '1px solid #333',
+            justifyContent: 'center'
+          }}>
+            {EMOJIS.map(emoji => (
+              <div 
+                key={emoji}
+                onClick={() => setIconValue(emoji)}
+                className="emoji-item"
+                style={{
+                  fontSize: '18px', width: '36px', height: '36px', display: 'flex', 
+                  alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+                  borderRadius: '8px', transition: 'all 0.2s',
+                  border: iconValue === emoji ? '2px solid #22c55e' : '1px solid transparent',
+                  backgroundColor: iconValue === emoji ? 'rgba(34, 197, 94, 0.1)' : '#1a1a1a',
+                }}
+              >
+                {emoji}
+              </div>
+            ))}
+            <style>{`
+              .emoji-item:hover {
+                background-color: #2a2a2a !important;
+                transform: scale(1.1);
+              }
+            `}</style>
+          </div>
+        </div>
+        {/* --- END ICON SELECTOR --- */}
 
         <div style={inputGroupStyle}>
           <label style={labelStyle}>Your Channel URL (optional)</label>

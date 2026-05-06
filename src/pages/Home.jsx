@@ -7,28 +7,31 @@ import supabase from '../lib/supabase';
 
 const cardStyle = {
   width: '100%',
-  backgroundColor: '#1a1a1a',
-  border: '1px solid #333',
-  borderRadius: '12px',
-  padding: '20px',
+  backgroundColor: 'rgba(26, 26, 26, 0.8)',
+  backdropFilter: 'blur(10px)',
+  borderRadius: '16px',
   boxSizing: 'border-box',
   display: 'flex',
   flexDirection: 'column',
   position: 'relative',
-  transition: 'transform 0.2s, border-color 0.2s',
+  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+  boxShadow: '0 4px 24px -1px rgba(0, 0, 0, 0.2)',
+  padding: '1px', // Gap for the rotating border
+  overflow: 'hidden',
 };
 
 const avatarStyle = {
-  width: '44px',
-  height: '44px',
+  width: '60px',
+  height: '60px',
   borderRadius: '50%',
   color: 'white',
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
-  fontSize: '20px',
+  fontSize: '32px',
   fontWeight: 'bold',
-  flexShrink: 0
+  flexShrink: 0,
+  overflow: 'hidden'
 };
 
 const channelNameStyle = {
@@ -167,20 +170,67 @@ const Toast = ({ message, type, onClose }) => {
   );
 };
 
-const ChannelCard = ({ ch, onView, onEdit, allChannels }) => {
+const ChannelCard = ({ ch, onView, onEdit, allChannels, index }) => {
   const accentColor = ch.color || getFallbackColor(allChannels, ch);
-  return (
-    <div style={{ ...cardStyle, borderTop: `4px solid ${accentColor}` }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-        <div style={{ ...avatarStyle, backgroundColor: accentColor }}>
-          {(ch.name || '?').charAt(0).toUpperCase()}
-        </div>
-        <h2 style={channelNameStyle}>{ch.name}</h2>
-      </div>
+  
+  // Create variations in timing for a more natural feel
+  const duration = 5 + (index % 3);
+  const delay = index * 0.7;
 
-      <div style={buttonRowStyle}>
-        <button style={viewButtonStyle} onClick={() => onView(ch.id)}>View</button>
-        <button style={actionButtonStyle} onClick={() => onEdit(ch)}>Edit</button>
+  return (
+    <div 
+      className="shimmer-card"
+      style={{ 
+        ...cardStyle, 
+        cursor: 'pointer',
+        '--accent-color': accentColor,
+        '--accent-glow': `${accentColor}44`, 
+        '--float-delay': `${delay}s`,
+        '--float-duration': `${duration}s`
+      }}
+      onClick={() => onView(ch.id)}
+    >
+      <div style={{
+        backgroundColor: 'rgba(20, 20, 20, 0.95)',
+        borderRadius: '15px',
+        padding: '24px',
+        height: '100%',
+        width: '100%',
+        boxSizing: 'border-box',
+        display: 'flex',
+        flexDirection: 'column',
+        position: 'relative',
+        zIndex: 2,
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <div style={{ ...avatarStyle, border: `2px solid ${accentColor}`, backgroundColor: '#111' }}>
+            {ch.icon ? (
+              ch.icon.startsWith('data:') ? (
+                <img src={ch.icon} alt={ch.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              ) : (
+                <span>{ch.icon}</span>
+              )
+            ) : (
+              <span>{(ch.name || '?').charAt(0).toUpperCase()}</span>
+            )}
+          </div>
+          <h2 style={channelNameStyle}>{ch.name}</h2>
+        </div>
+
+        <div style={buttonRowStyle}>
+          <button 
+            style={viewButtonStyle} 
+            onClick={(e) => { e.stopPropagation(); onView(ch.id); }}
+          >
+            View
+          </button>
+          <button 
+            style={actionButtonStyle} 
+            onClick={(e) => { e.stopPropagation(); onEdit(ch); }}
+          >
+            Edit
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -197,7 +247,11 @@ const Home = () => {
   const [editUrl, setEditUrl] = useState('');
   const [editCompetitors, setEditCompetitors] = useState([]);
   const [editColor, setEditColor] = useState(null);
+  const [editIconValue, setEditIconValue] = useState('');
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(null);
+
+  const EMOJIS = ['🎬', '🎵', '🎮', '📚', '🍕', '💪', '🛍️', '✈️', '🎨', '💼', '🏠', '❤️'];
 
   // Delete Modal State
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -230,6 +284,7 @@ const Home = () => {
     setEditName(ch.name);
     setEditUrl(ch.description || '');
     setEditColor(ch.color || getFallbackColor(channels, ch));
+    setEditIconValue(ch.icon || '🎬');
     
     // Fetch competitors
     const { data, error } = await supabase
@@ -266,12 +321,23 @@ const Home = () => {
       return;
     }
 
+    const validCompetitors = editCompetitors.filter(c => c.name.trim() || c.keywordsUrl.trim());
+    if (validCompetitors.length === 0) {
+      showToast('❌ Add at least 1 competitor URL to save', 'error');
+      return;
+    }
+
     setSaving(true);
     try {
       // 1. Update channel
       const { error: chError } = await supabase
         .from('my_channels')
-        .update({ name: editName, description: editUrl, color: editColor })
+        .update({ 
+          name: editName, 
+          description: editUrl, 
+          color: editColor,
+          icon: editIconValue
+        })
         .eq('id', editingChannel.id);
       
       if (chError) throw chError;
@@ -315,8 +381,7 @@ const Home = () => {
   };
 
   const handleDeletePermanently = async () => {
-    if (confirmName !== editingChannel.name) return;
-
+    // The button is disabled unless the names match, so we can proceed
     setDeleting(true);
     try {
       const chId = editingChannel.id;
@@ -349,6 +414,7 @@ const Home = () => {
     width: '100%',
     minHeight: '100vh',
     backgroundColor: '#0f0f0f',
+    backgroundImage: 'radial-gradient(circle at 50% -20%, #1e1e1e 0%, #0f0f0f 80%)',
     fontFamily: 'Inter, sans-serif',
     color: 'white',
     padding: '40px',
@@ -367,15 +433,92 @@ const Home = () => {
 
   return (
     <div style={containerStyle}>
+      <style>{`
+        @keyframes shimmer {
+          0% { transform: translateX(-150%) skewX(-25deg); opacity: 0; }
+          2% { opacity: 1; }
+          15% { transform: translateX(150%) skewX(-25deg); opacity: 1; }
+          17%, 100% { transform: translateX(150%) skewX(-25deg); opacity: 0; }
+        }
+
+        @keyframes glowShift {
+          0%, 100% { 
+            box-shadow: 0 8px 32px -4px rgba(0, 0, 0, 0.3), 0 0 20px -5px var(--accent-glow);
+          }
+          50% { 
+            box-shadow: 0 20px 48px -8px rgba(0, 0, 0, 0.5), 0 0 35px 2px var(--accent-glow);
+          }
+        }
+
+        @keyframes rotate {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+
+        .shimmer-card {
+          position: relative;
+          overflow: hidden;
+          animation: glowShift var(--float-duration, 6s) ease-in-out infinite;
+          animation-delay: var(--float-delay, 0s);
+        }
+
+        .shimmer-card::before {
+          content: "";
+          position: absolute;
+          width: 200%;
+          height: 200%;
+          top: -50%;
+          left: -50%;
+          background: conic-gradient(
+            transparent,
+            var(--accent-color, #fff) 10%,
+            transparent 25%,
+            transparent 50%,
+            var(--accent-color, #fff) 60%,
+            transparent 75%,
+            transparent 100%
+          );
+          animation: rotate 4s linear infinite;
+          z-index: 1;
+        }
+
+        .shimmer-card::after {
+          content: "";
+          position: absolute;
+          top: 0;
+          left: 0;
+          width: 80%;
+          height: 100%;
+          background: linear-gradient(
+            to right,
+            transparent 0%,
+            rgba(255, 255, 255, 0.05) 40%,
+            rgba(255, 255, 255, 0.15) 50%,
+            rgba(255, 255, 255, 0.05) 60%,
+            transparent 100%
+          );
+          animation: shimmer 7s infinite linear;
+          pointer-events: none;
+          z-index: 3;
+        }
+
+        .shimmer-card:hover {
+          animation-play-state: paused;
+          transform: translateY(-15px) scale(1.02) !important;
+          box-shadow: 0 25px 60px -12px rgba(0, 0, 0, 0.6), 0 0 40px 5px var(--accent-glow) !important;
+          z-index: 10;
+        }
+      `}</style>
       <div style={{ marginBottom: '40px' }}>
         <h1 style={{ fontSize: '32px', fontWeight: 'bold', margin: 0 }}>Welcome, RK 👋</h1>
       </div>
 
       <div style={centerAreaStyle}>
-        {channels.map((ch) => (
+        {channels.map((ch, index) => (
           <ChannelCard 
             key={ch.id} 
             ch={ch} 
+            index={index}
             allChannels={channels}
             onView={(id) => navigate(`/home/${id}`)}
             onEdit={handleOpenEdit}
@@ -383,19 +526,36 @@ const Home = () => {
         ))}
 
         <div 
+          className="shimmer-card"
           style={{ 
             ...cardStyle, 
-            border: '2px dashed #333', 
-            height: '130px', 
-            justifyContent: 'center', 
-            alignItems: 'center', 
+            height: '140px', 
             cursor: 'pointer',
-            backgroundColor: 'transparent'
+            backgroundColor: 'transparent',
+            '--accent-color': 'rgba(255, 255, 255, 0.1)',
+            '--accent-glow': 'rgba(255,255,255,0.05)',
+            '--float-delay': '1.5s',
+            '--float-duration': '7s'
           }} 
           onClick={() => navigate('/add-channel')}
         >
-          <span style={{ fontSize: '32px', color: '#555' }}>+</span>
-          <span style={{ color: '#888', marginTop: '8px', fontSize: '14px', fontWeight: 'bold' }}>Add Channel</span>
+          <div style={{
+            backgroundColor: 'rgba(20, 20, 20, 0.95)',
+            borderRadius: '15px',
+            height: '100%',
+            width: '100%',
+            boxSizing: 'border-box',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'center',
+            alignItems: 'center',
+            position: 'relative',
+            zIndex: 2,
+            border: '1px dashed rgba(255, 255, 255, 0.1)',
+          }}>
+            <span style={{ fontSize: '32px', color: '#444' }}>+</span>
+            <span style={{ color: '#666', marginTop: '8px', fontSize: '14px', fontWeight: 'bold' }}>Add Channel</span>
+          </div>
         </div>
       </div>
 
@@ -414,6 +574,41 @@ const Home = () => {
                 placeholder="e.g. My Awesome Channel"
               />
             </div>
+
+            {/* --- EDIT MODAL ICON SELECTOR --- */}
+            <div style={inputGroupStyle}>
+              <label style={labelStyle}>Channel Icon</label>
+              
+              <div style={{ 
+                display: 'flex', flexWrap: 'wrap', gap: '8px',
+                backgroundColor: '#0a0a0a', padding: '10px', borderRadius: '12px', border: '1px solid #333',
+                justifyContent: 'center'
+              }}>
+                {EMOJIS.map(emoji => (
+                  <div 
+                    key={emoji}
+                    onClick={() => setEditIconValue(emoji)}
+                    className="modal-emoji-item"
+                    style={{
+                      fontSize: '16px', width: '32px', height: '32px', display: 'flex',
+                      alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+                      borderRadius: '6px', transition: 'all 0.2s',
+                      border: editIconValue === emoji ? '2px solid #22c55e' : '1px solid transparent',
+                      backgroundColor: editIconValue === emoji ? 'rgba(34, 197, 94, 0.1)' : '#111',
+                    }}
+                  >
+                    {emoji}
+                  </div>
+                ))}
+                <style>{`
+                  .modal-emoji-item:hover {
+                    background-color: #2a2a2a !important;
+                    transform: scale(1.1);
+                  }
+                `}</style>
+              </div>
+            </div>
+            {/* --- END ICON SELECTOR --- */}
 
             <div style={inputGroupStyle}>
               <label style={labelStyle}>Topic Color</label>
@@ -542,14 +737,18 @@ const Home = () => {
               <button 
                 style={{ 
                   ...actionButtonStyle, 
-                  backgroundColor: confirmName === editingChannel.name ? '#ef4444' : '#333', 
+                  backgroundColor: confirmName.trim().toLowerCase() === editingChannel.name.trim().toLowerCase() ? '#ef4444' : '#333', 
                   color: 'white', 
                   border: 'none',
-                  opacity: confirmName === editingChannel.name ? 1 : 0.5,
-                  cursor: confirmName === editingChannel.name ? 'pointer' : 'not-allowed'
+                  opacity: confirmName.trim().toLowerCase() === editingChannel.name.trim().toLowerCase() ? 1 : 0.5,
+                  cursor: confirmName.trim().toLowerCase() === editingChannel.name.trim().toLowerCase() ? 'pointer' : 'not-allowed',
+                  pointerEvents: 'auto' // Ensure clicks are always registered if visible
                 }} 
-                onClick={handleDeletePermanently}
-                disabled={confirmName !== editingChannel.name || deleting}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleDeletePermanently();
+                }}
+                disabled={confirmName.trim().toLowerCase() !== editingChannel.name.trim().toLowerCase() || deleting}
               >
                 {deleting ? 'Deleting...' : 'Delete Forever'}
               </button>
