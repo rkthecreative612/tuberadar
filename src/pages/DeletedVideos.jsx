@@ -140,50 +140,67 @@ function DeletedVideos() {
   };
 
   return (
-    <div style={{ height: '100%', overflowY: 'auto', backgroundColor: COLORS.bgMain, padding: '22px', boxSizing: 'border-box', color: COLORS.textPrimary, fontFamily: 'system-ui' }}>
-      <h1 style={proHeadingStyle}>Trash</h1>
-      <div style={{ fontSize: '12px', color: '#666', marginBottom: '20px', fontStyle: 'italic' }}>
-        Videos are automatically removed after 30 days
+    <div style={{ height: '100%', overflowY: 'auto', backgroundColor: COLORS.bgMain, padding: '32px 28px', boxSizing: 'border-box', color: COLORS.textPrimary, fontFamily: '"Inter", system-ui, sans-serif' }}>
+      <div style={{ width: '100%', marginBottom: '28px' }}>
+        <h1 style={proHeadingStyle}>Trash</h1>
+        <div style={{ fontSize: '13px', color: '#666', marginTop: '6px', fontStyle: 'italic' }}>
+          Videos are automatically removed after 30 days
+        </div>
       </div>
 
-      {loading && <div>Loading...</div>}
+      {loading && <div style={{ color: COLORS.textSecondary }}>Loading...</div>}
 
       {!loading && deletedVideos.length === 0 && (
-        <div style={{ color: COLORS.textSecondary, padding: '40px 20px', textAlign: 'center' }}>
+        <div style={{
+          color: COLORS.textSecondary,
+          padding: '48px 24px',
+          textAlign: 'center',
+          backgroundColor: COLORS.bgCard,
+          border: '1px solid rgba(255,255,255,0.06)',
+          borderRadius: '16px',
+          width: '100%',
+          boxSizing: 'border-box',
+        }}>
           No deleted videos
         </div>
       )}
 
       {!loading && deletedVideos.length > 0 && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxWidth: '900px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', width: '100%' }}>
           {deletedVideos.map(v => {
             const daysLeft = getDaysLeft(v.deleted_at);
             const topicColor = getTopicColor(v.topic_id);
-            const hoverGlow = `0 0 28px ${hexToRgba(topicColor, 0.38)}`;
+            const hoverGlow = `0 8px 32px ${hexToRgba(topicColor, 0.18)}`;
             return (
               <div
                 key={v.id}
                 style={{
-                  backgroundColor: COLORS.bgCard,
+                  width: '100%',
+                  boxSizing: 'border-box',
+                  background: 'linear-gradient(145deg, #1a1a1a 0%, #121212 100%)',
                   border: '1px solid rgba(255, 255, 255, 0.06)',
-                  borderRadius: '12px',
-                  padding: '14px 12px',
+                  borderRadius: '14px',
+                  padding: '20px 24px',
                   display: 'flex',
-                  gap: '12px',
+                  gap: '20px',
                   alignItems: 'center',
-                  boxShadow: 'none',
-                  transition: 'box-shadow 180ms ease',
+                  boxShadow: '0 4px 20px rgba(0, 0, 0, 0.25)',
+                  transition: 'transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease',
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.boxShadow = `${hoverGlow}, 0 0 0 1px rgba(255,255,255,0.03)`;
+                  e.currentTarget.style.transform = 'translateX(4px)';
+                  e.currentTarget.style.boxShadow = hoverGlow;
+                  e.currentTarget.style.borderColor = `${hexToRgba(topicColor, 0.35)}`;
 
                   const dot = e.currentTarget.querySelector('.deleted-topic-dot');
                   if (dot) {
-                    dot.style.boxShadow = `0 0 0 3px ${hexToRgba(topicColor, 0.12)}, 0 0 16px ${hexToRgba(topicColor, 0.35)}`;
+                    dot.style.boxShadow = `0 0 0 4px ${hexToRgba(topicColor, 0.15)}, 0 0 20px ${hexToRgba(topicColor, 0.4)}`;
                   }
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.boxShadow = 'none';
+                  e.currentTarget.style.transform = 'translateX(0)';
+                  e.currentTarget.style.boxShadow = '0 4px 20px rgba(0, 0, 0, 0.25)';
+                  e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.06)';
 
                   const dot = e.currentTarget.querySelector('.deleted-topic-dot');
                   if (dot) {
@@ -191,11 +208,10 @@ function DeletedVideos() {
                   }
                 }}
               >
-                {/* Topic Dot */}
                 <div
                   style={{
-                    width: '10px',
-                    height: '10px',
+                    width: '12px',
+                    height: '12px',
                     borderRadius: '50%',
                     backgroundColor: topicColor,
                     flexShrink: 0,
@@ -203,80 +219,95 @@ function DeletedVideos() {
                   }}
                   className="deleted-topic-dot"
                 />
-                
-                {/* Video Info */}
-                <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: '600', fontSize: '13px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      {v.video_title} 
-                      {v.cancellation_reason && <span style={{ fontWeight: 'normal', color: COLORS.textSecondary, fontSize: '11px', fontStyle: 'italic' }}>({v.cancellation_reason})</span>}
-                      {v.is_completed && (
-                        <div 
-                          className="completion-badge" 
-                          style={{ 
-                            display: 'flex', 
-                            alignItems: 'center', 
-                            justifyContent: 'center', 
-                            width: '14px', 
-                            height: '14px', 
-                            borderRadius: '50%', 
-                            border: `1px solid ${COLORS.accentGreen}`, 
-                            color: COLORS.accentGreen, 
-                            fontSize: '10px', 
-                            cursor: 'help' 
-                          }}
-                          title="video is completed"
-                        >
-                          ✓
-                        </div>
-                      )}
-                    </div>
-                    <div style={{ fontSize: '12px', color: COLORS.textSecondary, marginTop: '4px' }}>{getTopicName(v.topic_id)}</div>
+
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: 700, fontSize: '15px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '8px', color: '#fff' }}>
+                    {v.video_title}
+                    {v.cancellation_reason && (
+                      <span style={{ fontWeight: 500, color: COLORS.textSecondary, fontSize: '12px', fontStyle: 'italic' }}>
+                        ({v.cancellation_reason})
+                      </span>
+                    )}
+                    {v.is_completed && (
+                      <div
+                        className="completion-badge"
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          width: '18px',
+                          height: '18px',
+                          borderRadius: '50%',
+                          border: `1px solid ${COLORS.accentGreen}`,
+                          color: COLORS.accentGreen,
+                          fontSize: '10px',
+                          cursor: 'help',
+                        }}
+                        title="video is completed"
+                      >
+                        ✓
+                      </div>
+                    )}
+                  </div>
+                  <div style={{ fontSize: '12px', color: topicColor, marginTop: '6px', fontWeight: 600, letterSpacing: '0.02em' }}>
+                    {getTopicName(v.topic_id)}
                   </div>
                 </div>
 
-                {/* Days Left Badge */}
-                <div style={{ fontSize: '12px', color: daysLeft <= 7 ? COLORS.accentRed : COLORS.textSecondary, fontWeight: '600', minWidth: '80px', textAlign: 'right' }}>
-                  {daysLeft === 0 ? '0 days' : `${daysLeft} day${daysLeft !== 1 ? 's' : ''}`}
+                <div style={{
+                  fontSize: '11px',
+                  fontWeight: 800,
+                  letterSpacing: '0.06em',
+                  textTransform: 'uppercase',
+                  color: daysLeft <= 7 ? COLORS.accentRed : COLORS.textSecondary,
+                  minWidth: '100px',
+                  textAlign: 'center',
+                  padding: '8px 14px',
+                  borderRadius: '10px',
+                  backgroundColor: daysLeft <= 7 ? 'rgba(239, 68, 68, 0.1)' : 'rgba(255,255,255,0.04)',
+                  border: `1px solid ${daysLeft <= 7 ? 'rgba(239, 68, 68, 0.25)' : 'rgba(255,255,255,0.06)'}`,
+                }}>
+                  {daysLeft === 0 ? 'Expires today' : `${daysLeft} day${daysLeft !== 1 ? 's' : ''} left`}
                 </div>
 
-                {/* Action Buttons */}
-                <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
+                <div style={{ display: 'flex', gap: '10px', flexShrink: 0 }}>
                   <button
                     onClick={() => handleRestore(v.id)}
                     style={{
-                      padding: '8px 16px',
-                      borderRadius: '6px',
-                      border: 'none',
-                      backgroundColor: COLORS.accentGreen,
-                      color: '#fff',
+                      padding: '10px 20px',
+                      borderRadius: '10px',
+                      border: `1px solid ${COLORS.accentGreen}44`,
+                      backgroundColor: `${COLORS.accentGreen}18`,
+                      color: COLORS.accentGreen,
                       cursor: 'pointer',
-                      fontWeight: '600',
-                      fontSize: '12px',
-                      transition: 'opacity 0.2s',
+                      fontWeight: 800,
+                      fontSize: '11px',
+                      letterSpacing: '0.06em',
+                      transition: 'all 0.2s ease',
                     }}
-                    onMouseEnter={e => e.currentTarget.style.opacity = '0.8'}
-                    onMouseLeave={e => e.currentTarget.style.opacity = '1'}
+                    onMouseEnter={e => { e.currentTarget.style.backgroundColor = `${COLORS.accentGreen}30`; e.currentTarget.style.transform = 'translateY(-1px)'; }}
+                    onMouseLeave={e => { e.currentTarget.style.backgroundColor = `${COLORS.accentGreen}18`; e.currentTarget.style.transform = 'translateY(0)'; }}
                   >
-                    Restore
+                    RESTORE
                   </button>
                   <button
                     onClick={() => handleDeleteForever(v.id)}
                     style={{
-                      padding: '8px 16px',
-                      borderRadius: '6px',
-                      border: 'none',
-                      backgroundColor: COLORS.accentRed,
-                      color: '#fff',
+                      padding: '10px 20px',
+                      borderRadius: '10px',
+                      border: `1px solid ${COLORS.accentRed}44`,
+                      backgroundColor: `${COLORS.accentRed}18`,
+                      color: COLORS.accentRed,
                       cursor: 'pointer',
-                      fontWeight: '600',
-                      fontSize: '12px',
-                      transition: 'opacity 0.2s',
+                      fontWeight: 800,
+                      fontSize: '11px',
+                      letterSpacing: '0.06em',
+                      transition: 'all 0.2s ease',
                     }}
-                    onMouseEnter={e => e.currentTarget.style.opacity = '0.8'}
-                    onMouseLeave={e => e.currentTarget.style.opacity = '1'}
+                    onMouseEnter={e => { e.currentTarget.style.backgroundColor = `${COLORS.accentRed}30`; e.currentTarget.style.transform = 'translateY(-1px)'; }}
+                    onMouseLeave={e => { e.currentTarget.style.backgroundColor = `${COLORS.accentRed}18`; e.currentTarget.style.transform = 'translateY(0)'; }}
                   >
-                    Delete Forever
+                    DELETE FOREVER
                   </button>
                 </div>
               </div>

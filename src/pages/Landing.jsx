@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
 import supabase from '../lib/supabase'
+import LogoutButton from '../components/LogoutButton'
 
 const COLORS = {
   bgMain: '#0f0f0f',
@@ -120,7 +120,6 @@ const getCountdown = (dateString) => {
 }
 
 const Landing = () => {
-  const navigate = useNavigate()
   const [videosData, setVideosData] = useState([])
   const [channels, setChannels] = useState([])
   const [loading, setLoading] = useState(true)
@@ -467,7 +466,7 @@ const Landing = () => {
   if (loading) return <div style={{ color: 'white', padding: '40px' }}>Loading Dashboard...</div>
 
   return (
-    <div style={{ width: '100%', height: '100%', backgroundColor: COLORS.bgMain, padding: '40px 20px', overflowY: 'auto', color: 'white', fontFamily: 'Inter, system-ui, sans-serif', boxSizing: 'border-box' }}>
+    <div style={{ width: '100%', height: '100%', backgroundColor: COLORS.bgMain, padding: '40px 20px', overflowY: 'auto', color: 'white', fontFamily: 'Inter, system-ui, sans-serif', boxSizing: 'border-box', position: 'relative' }}>
       <style>{`
         @keyframes fadeOutSlideUp {
           0% { opacity: 1; transform: translateY(0); }
@@ -542,6 +541,8 @@ const Landing = () => {
           transform: scale(1.02);
         }
       `}</style>
+
+      <LogoutButton variant="floating" />
 
       {/* SECTION 1: WELCOME + QUOTE */}
       <section style={{ textAlign: 'center', marginBottom: '40px' }}>

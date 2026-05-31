@@ -1,7 +1,8 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Navigate, Outlet, Route, Routes } from 'react-router-dom'
 
 import Sidebar from './components/Sidebar'
+import supabase from './lib/supabase'
 
 import Home from './pages/Home'
 import AddChannel from './pages/AddChannel'
@@ -23,6 +24,35 @@ import { deleteOldDeletedVideos } from './lib/autoDeleteOldVideos'
 
 
 
+
+function ProtectedRoute() {
+  const [session, setSession] = useState(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session)
+      setLoading(false)
+    })
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session)
+      setLoading(false)
+    })
+
+    return () => subscription.unsubscribe()
+  }, [])
+
+  if (loading) {
+    return null
+  }
+
+  if (!session) {
+    return <Navigate to="/login" replace />
+  }
+
+  return <Outlet />
+}
 
 function AppLayout() {
   const shellStyle = {
@@ -65,27 +95,27 @@ function App() {
 
     <Routes>
       <Route path="/login" element={<Login />} />
-      <Route element={<AppLayout />}>
-        <Route path="/" element={<Landing />} />
-        <Route path="/home" element={<Home />} />
-        <Route path="/landing" element={<Landing />} />
-        <Route path="/add-channel" element={<AddChannel />} />
+      <Route element={<ProtectedRoute />}>
+        <Route element={<AppLayout />}>
+          <Route path="/" element={<Landing />} />
+          <Route path="/home" element={<Home />} />
+          <Route path="/landing" element={<Landing />} />
+          <Route path="/add-channel" element={<AddChannel />} />
 
-        <Route path="/home/:channelId" element={<Dashboard />} />
-        <Route path="/brainstorm" element={<Brainstorm />} />
-        <Route path="/brainstorm/:topicId" element={<BrainstormTopic />} />
-        <Route path="/planner" element={<Planner />} />
-        <Route path="/scheduler" element={<Scheduler />} />
-        <Route path="/status" element={<Status />} />
-        <Route path="/deleted-videos" element={<DeletedVideos />} />
-        <Route path="/completed-videos" element={<CompletedVideos />} />
-        <Route path="/smart-search" element={<SmartSearch />} />
+          <Route path="/home/:channelId" element={<Dashboard />} />
+          <Route path="/brainstorm" element={<Brainstorm />} />
+          <Route path="/brainstorm/:topicId" element={<BrainstormTopic />} />
+          <Route path="/planner" element={<Planner />} />
+          <Route path="/scheduler" element={<Scheduler />} />
+          <Route path="/status" element={<Status />} />
+          <Route path="/deleted-videos" element={<DeletedVideos />} />
+          <Route path="/completed-videos" element={<CompletedVideos />} />
+          <Route path="/smart-search" element={<SmartSearch />} />
 
-
-
-        <Route path="/revenue" element={<RevenueTracker />} />
-        <Route path="/topic-revenue/:channelId" element={<TopicRevenueDetail />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
+          <Route path="/revenue" element={<RevenueTracker />} />
+          <Route path="/topic-revenue/:channelId" element={<TopicRevenueDetail />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Route>
       </Route>
     </Routes>
   )

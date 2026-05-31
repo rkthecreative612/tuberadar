@@ -160,131 +160,162 @@ function CompletedVideos() {
   };
 
   return (
-    <div style={{ height: '100%', overflowY: 'auto', backgroundColor: COLORS.bgMain, padding: '22px', boxSizing: 'border-box', color: COLORS.textPrimary, fontFamily: 'system-ui' }}>
-      <div style={{ position: 'relative', display: 'flex', justifyContent: 'center', alignItems: 'center', marginBottom: '32px' }}>
-        <h1 style={proHeadingStyle}>Published</h1>
+    <div style={{ height: '100%', overflowY: 'auto', backgroundColor: COLORS.bgMain, padding: '32px 28px', boxSizing: 'border-box', color: COLORS.textPrimary, fontFamily: '"Inter", system-ui, sans-serif' }}>
+      <div style={{ position: 'relative', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '28px', width: '100%' }}>
+        <div>
+          <h1 style={{ ...proHeadingStyle, textAlign: 'left' }}>Published</h1>
+          <div style={{ fontSize: '13px', color: '#666', marginTop: '6px' }}>
+            {completedVideos.length} completed video{completedVideos.length !== 1 ? 's' : ''}
+          </div>
+        </div>
 
         <button
           onClick={openDeleteAllConfirm}
           disabled={loading || completedVideos.length === 0}
           style={{
-            position: 'absolute',
-            right: 0,
-            padding: '10px 14px',
-            borderRadius: '10px',
-            border: '1px solid rgba(255,255,255,0.08)',
-            backgroundColor: 'rgba(239, 68, 68, 0.12)',
+            padding: '11px 20px',
+            borderRadius: '12px',
+            border: '1px solid rgba(239, 68, 68, 0.35)',
+            background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.18) 0%, rgba(80, 0, 0, 0.12) 100%)',
             color: '#fff',
             cursor: loading || completedVideos.length === 0 ? 'not-allowed' : 'pointer',
             fontWeight: 800,
-            fontSize: '12px',
-            letterSpacing: '0.02em',
+            fontSize: '11px',
+            letterSpacing: '0.06em',
             opacity: loading || completedVideos.length === 0 ? 0.4 : 1,
-            transition: 'opacity 0.2s, transform 0.2s',
+            transition: 'transform 0.2s ease, box-shadow 0.2s ease',
+            boxShadow: '0 4px 16px rgba(239, 68, 68, 0.12)',
           }}
           onMouseEnter={(e) => {
-            if (!e.currentTarget.disabled) e.currentTarget.style.transform = 'translateY(-1px)';
+            if (!e.currentTarget.disabled) {
+              e.currentTarget.style.transform = 'translateY(-2px)';
+              e.currentTarget.style.boxShadow = '0 8px 24px rgba(239, 68, 68, 0.25)';
+            }
           }}
           onMouseLeave={(e) => {
             e.currentTarget.style.transform = 'translateY(0)';
+            e.currentTarget.style.boxShadow = '0 4px 16px rgba(239, 68, 68, 0.12)';
           }}
         >
-          Delete All
+          DELETE ALL
         </button>
       </div>
 
-      {loading && <div>Loading...</div>}
+      {loading && <div style={{ color: COLORS.textSecondary }}>Loading...</div>}
 
       {!loading && completedVideos.length === 0 && (
-        <div style={{ color: COLORS.textSecondary, padding: '40px 20px', textAlign: 'center' }}>
+        <div style={{
+          color: COLORS.textSecondary,
+          padding: '48px 24px',
+          textAlign: 'center',
+          backgroundColor: COLORS.bgCard,
+          border: '1px solid rgba(255,255,255,0.06)',
+          borderRadius: '16px',
+          width: '100%',
+          boxSizing: 'border-box',
+        }}>
           No completed videos yet.
         </div>
       )}
 
       {!loading && completedVideos.length > 0 && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxWidth: '1000px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', width: '100%' }}>
           {completedVideos.map((v) => {
             const topicColor = getTopicColor(v.topic_id);
-            const hoverGlow = `0 0 26px ${hexToRgba(topicColor, 0.34)}`;
+            const hoverGlow = `0 8px 32px ${hexToRgba(topicColor, 0.18)}`;
 
             return (
               <div
                 key={v.id}
                 style={{
-                  backgroundColor: COLORS.bgCard,
-                  border: `1px solid ${COLORS.borderDefault}`,
-                  borderRadius: '8px',
-                  padding: '12px 16px',
+                  width: '100%',
+                  boxSizing: 'border-box',
+                  background: 'linear-gradient(145deg, #1a1a1a 0%, #121212 100%)',
+                  border: '1px solid rgba(255, 255, 255, 0.06)',
+                  borderRadius: '14px',
+                  padding: '20px 24px',
                   display: 'flex',
-                  gap: '12px',
+                  gap: '20px',
                   alignItems: 'center',
                   cursor: 'pointer',
-                  boxShadow: 'none',
-                  transition: 'box-shadow 180ms ease',
+                  boxShadow: '0 4px 20px rgba(0, 0, 0, 0.25)',
+                  transition: 'transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease',
                 }}
                 onClick={() => setSelectedVideo(v)}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.boxShadow = `${hoverGlow}, 0 0 0 1px rgba(255,255,255,0.03)`;
+                  e.currentTarget.style.transform = 'translateX(4px)';
+                  e.currentTarget.style.boxShadow = hoverGlow;
+                  e.currentTarget.style.borderColor = `${hexToRgba(topicColor, 0.35)}`;
                   const dot = e.currentTarget.querySelector('.completed-topic-dot');
                   if (dot) {
-                    dot.style.boxShadow = `0 0 0 3px ${hexToRgba(topicColor, 0.12)}, 0 0 16px ${hexToRgba(topicColor, 0.35)}`;
+                    dot.style.boxShadow = `0 0 0 4px ${hexToRgba(topicColor, 0.15)}, 0 0 20px ${hexToRgba(topicColor, 0.4)}`;
                   }
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.boxShadow = 'none';
+                  e.currentTarget.style.transform = 'translateX(0)';
+                  e.currentTarget.style.boxShadow = '0 4px 20px rgba(0, 0, 0, 0.25)';
+                  e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.06)';
                   const dot = e.currentTarget.querySelector('.completed-topic-dot');
                   if (dot) {
                     dot.style.boxShadow = 'none';
                   }
                 }}
               >
-                {/* Topic Dot */}
                 <div
-                  style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: topicColor, flexShrink: 0, boxShadow: 'none' }}
+                  style={{ width: '12px', height: '12px', borderRadius: '50%', backgroundColor: topicColor, flexShrink: 0, boxShadow: 'none' }}
                   className="completed-topic-dot"
                 />
 
-                {/* Video Info */}
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontWeight: '600', fontSize: '14px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <div style={{ fontWeight: 700, fontSize: '15px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#fff' }}>
                     {v.video_title}
                   </div>
-                  <div style={{ fontSize: '12px', color: COLORS.textSecondary, marginTop: '4px' }}>{getTopicName(v.topic_id)}</div>
-                </div>
-
-                {/* Dates */}
-                <div style={{ display: 'flex', gap: '24px', fontSize: '12px', color: COLORS.textSecondary, minWidth: '300px', justifyContent: 'flex-end' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-                    <span style={{ fontSize: '10px', fontWeight: 'bold', color: '#666', textTransform: 'uppercase' }}>Date Added:</span>
-                    <span style={{ color: '#aaa' }}>{formatDate(v.original_added_at || v.created_at)}</span>
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-                    <span style={{ fontSize: '10px', fontWeight: 'bold', color: COLORS.accentGreen, textTransform: 'uppercase' }}>Date Completed:</span>
-                    <span style={{ color: COLORS.accentGreen }}>{formatDate(v.completed_at)}</span>
+                  <div style={{ fontSize: '12px', color: topicColor, marginTop: '6px', fontWeight: 600, letterSpacing: '0.02em' }}>
+                    {getTopicName(v.topic_id)}
                   </div>
                 </div>
 
-                {/* Remove Button */}
+                <div style={{ display: 'flex', gap: '32px', fontSize: '12px', minWidth: '320px', justifyContent: 'flex-end' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <span style={{ fontSize: '10px', fontWeight: 800, color: '#555', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Date Added</span>
+                    <span style={{ color: '#aaa', fontWeight: 600 }}>{formatDate(v.original_added_at || v.created_at)}</span>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <span style={{ fontSize: '10px', fontWeight: 800, color: COLORS.accentGreen, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Completed</span>
+                    <span style={{ color: COLORS.accentGreen, fontWeight: 700 }}>{formatDate(v.completed_at)}</span>
+                  </div>
+                </div>
+
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
                     openRemoveConfirm(v.id);
                   }}
                   style={{
-                    background: 'none',
-                    border: 'none',
+                    background: 'rgba(239, 68, 68, 0.1)',
+                    border: '1px solid rgba(239, 68, 68, 0.25)',
                     color: COLORS.textSecondary,
-                    fontSize: '20px',
+                    fontSize: '18px',
                     cursor: 'pointer',
-                    padding: '4px 8px',
-                    borderRadius: '4px',
+                    padding: '8px 12px',
+                    borderRadius: '10px',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
+                    transition: 'all 0.2s ease',
+                    flexShrink: 0,
                   }}
                   title="Remove from completed"
-                  onMouseEnter={(e) => (e.currentTarget.style.color = COLORS.accentRed)}
-                  onMouseLeave={(e) => (e.currentTarget.style.color = COLORS.textSecondary)}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.color = COLORS.accentRed;
+                    e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.2)';
+                    e.currentTarget.style.borderColor = 'rgba(239, 68, 68, 0.45)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.color = COLORS.textSecondary;
+                    e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.1)';
+                    e.currentTarget.style.borderColor = 'rgba(239, 68, 68, 0.25)';
+                  }}
                 >
                   ×
                 </button>

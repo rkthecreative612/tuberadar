@@ -1,5 +1,6 @@
 /* eslint-disable react/prop-types */
 import { NavLink } from 'react-router-dom'
+import LogoutButton from './LogoutButton'
 
 function Sidebar() {
   const rootStyle = {
@@ -26,7 +27,7 @@ function Sidebar() {
     width: '34px',
     height: '34px',
     borderRadius: '8px',
-    backgroundColor: '#e10600',
+    objectFit: 'cover',
     flexShrink: 0,
   }
 
@@ -51,6 +52,7 @@ function Sidebar() {
     flexDirection: 'column',
     gap: '6px',
     padding: '0 6px',
+    flex: 1,
   }
 
   const linkBaseStyle = {
@@ -103,7 +105,7 @@ function Sidebar() {
   return (
     <aside style={rootStyle} aria-label="Sidebar">
       <div style={brandRowStyle}>
-        <div style={brandIconStyle} aria-hidden />
+        <img src="/tuberadorlogo.png" alt="TubeRadar logo" style={brandIconStyle} />
         <h1 style={brandTextStyle}>TubeRadar</h1>
       </div>
       <div style={dividerStyle} />
@@ -120,6 +122,8 @@ function Sidebar() {
         <Item to="/deleted-videos" label="Trash" />
         <Item to="/revenue" label="Monetization" />
       </nav>
+
+      <LogoutButton variant="sidebar" />
     </aside>
   )
 }
