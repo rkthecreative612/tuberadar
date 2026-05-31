@@ -109,19 +109,16 @@ function Sidebar() {
       <div style={dividerStyle} />
 
       <nav style={navStyle} aria-label="Navigation">
-        <Item to="/landing" label="Landing" />
-        <Item to="/completed-videos" label="Completed" />
-
-        <Item to="/home" label="Home" end />
-        <Item to="/brainstorm" label="Brainstorm" />
-        <Item to="/planner" label="Planner" />
-        <Item to="/scheduler" label="Scheduler" />
+        <Item to="/landing" label="Home" />
+        <Item to="/planner" label="Board" />
+        <Item to="/scheduler" label="Tasks" />
         <Item to="/status" label="Status" />
+        <Item to="/home" label="Channels" end />
+        <Item to="/brainstorm" label="Brainstorm" />
         <Item to="/smart-search" label="Smart Search" />
-        <Item to="/deleted-videos" label="Deleted Videos" />
-
-
-        <Item to="/revenue" label="Revenue tracker" />
+        <Item to="/completed-videos" label="Published" />
+        <Item to="/deleted-videos" label="Trash" />
+        <Item to="/revenue" label="Monetization" />
       </nav>
     </aside>
   )

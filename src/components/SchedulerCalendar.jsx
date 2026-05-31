@@ -126,7 +126,6 @@ const DroppableDayCell = ({ day, topicColors, onVideoClick }) => {
   const isToday = getLocalDateString(new Date()) === day.dateStr;
 
   const cellStyle = {
-    border: `1px solid ${COLORS.border}`,
     padding: '4px 6px',
     display: 'flex',
     flexDirection: 'column',
@@ -137,7 +136,7 @@ const DroppableDayCell = ({ day, topicColors, onVideoClick }) => {
     opacity: day.isCurrentMonth ? 1 : 0.5,
     position: 'relative',
     boxShadow: isOver ? 'inset 0 0 10px rgba(239, 68, 68, 0.3)' : undefined,
-    border: isOver ? '2px solid #ef4444' : (isToday ? '1px solid #555' : 'none'),
+    border: isOver ? '2px solid #ef4444' : (isToday ? '1px solid #555' : `1px solid ${COLORS.border}`),
     transition: 'all 0.1s ease',
     overflow: 'hidden'
   };
@@ -166,10 +165,10 @@ const DroppableDayCell = ({ day, topicColors, onVideoClick }) => {
           gap: '3px', 
           overflowY: 'auto', 
           flex: 1,
-          paddingBottom: day.videos.length > 2 ? '16px' : '0' 
+          paddingBottom: day.videos.length > 3 ? '16px' : '0' 
         }}
       >
-        {day.videos.map(video => (
+        {day.videos.slice(0, 3).map(video => (
           <DraggableVideoCard 
             key={video.id} 
             video={video} 
@@ -179,20 +178,23 @@ const DroppableDayCell = ({ day, topicColors, onVideoClick }) => {
         ))}
       </div>
 
-      {day.videos.length > 2 && (
-        <div style={{ 
-          position: 'absolute',
-          bottom: '2px',
-          right: '6px',
-          fontSize: '9px', 
-          color: COLORS.textSecondary, 
-          fontWeight: 'bold',
-          pointerEvents: 'none',
-          backgroundColor: 'rgba(15,15,15,0.8)',
-          padding: '1px 3px',
-          borderRadius: '2px'
-        }}>
-          + {day.videos.length - 2} more
+      {day.videos.length > 3 && (
+        <div 
+          title={day.videos.slice(3).map(v => v.video_title).join('\n')}
+          style={{ 
+            position: 'absolute',
+            bottom: '2px',
+            right: '6px',
+            fontSize: '9px', 
+            color: COLORS.textSecondary, 
+            fontWeight: 'bold',
+            backgroundColor: 'rgba(15,15,15,0.8)',
+            padding: '1px 3px',
+            borderRadius: '2px',
+            cursor: 'help'
+          }}
+        >
+          + {day.videos.length - 3} more
         </div>
       )}
     </div>

@@ -23,6 +23,19 @@ function CompletedVideos() {
   const [loading, setLoading] = useState(true);
   const [selectedVideo, setSelectedVideo] = useState(null);
   const [toast, setToast] = useState(null);
+  const [confirmModal, setConfirmModal] = useState({ open: false, type: null, videoId: null, busy: false });
+
+  const hexToRgba = (hex, alpha = 1) => {
+    // Supports formats like "#RRGGBB" and gracefully falls back to gray.
+    const normalized = (hex || '').toString().trim();
+    const m = normalized.match(/^#?([0-9a-fA-F]{6})$/);
+    if (!m) return `rgba(136, 136, 136, ${alpha})`;
+    const intVal = parseInt(m[1], 16);
+    const r = (intVal >> 16) & 255;
+    const g = (intVal >> 8) & 255;
+    const b = intVal & 255;
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  };
 
   useEffect(() => {
     async function load() {
@@ -75,8 +88,19 @@ function CompletedVideos() {
     setTimeout(() => setToast(null), 3000);
   };
 
+  const openRemoveConfirm = (videoId) => {
+    setConfirmModal({ open: true, type: 'single', videoId, busy: false });
+  };
+
+  const openDeleteAllConfirm = () => {
+    setConfirmModal({ open: true, type: 'all', videoId: null, busy: false });
+  };
+
+  const closeConfirm = () => {
+    setConfirmModal({ open: false, type: null, videoId: null, busy: false });
+  };
+
   const handleRemove = async (videoId) => {
-    if (!window.confirm('Are you sure you want to remove from completed page? It will go to Deleted Videos.')) return;
     try {
       await supabase
         .from('planner_videos')
@@ -94,9 +118,80 @@ function CompletedVideos() {
     }
   };
 
+  const handleDeleteAll = async () => {
+    try {
+      const deletedAt = new Date().toISOString();
+      await supabase
+        .from('planner_videos')
+        .update({ is_deleted: true, deleted_at: deletedAt })
+        .eq('is_completed', true)
+        .eq('is_deleted', false);
+
+      setCompletedVideos([]);
+      showToast('✅ Moved all to Deleted Videos');
+    } catch (err) {
+      console.error(err);
+      showToast('❌ Failed to delete all');
+    }
+  };
+
+  const handleConfirm = async () => {
+    if (!confirmModal.open || confirmModal.busy) return;
+    setConfirmModal(prev => ({ ...prev, busy: true }));
+
+    if (confirmModal.type === 'single' && confirmModal.videoId) {
+      await handleRemove(confirmModal.videoId);
+    } else if (confirmModal.type === 'all') {
+      await handleDeleteAll();
+    }
+
+    closeConfirm();
+  };
+
+  const proHeadingStyle = {
+    fontSize: '42px',
+    fontWeight: 900,
+    textTransform: 'uppercase',
+    textAlign: 'center',
+    letterSpacing: '0.15em',
+    color: '#fff',
+    margin: 0,
+    fontFamily: '"Inter", system-ui, sans-serif',
+  };
+
   return (
     <div style={{ height: '100%', overflowY: 'auto', backgroundColor: COLORS.bgMain, padding: '22px', boxSizing: 'border-box', color: COLORS.textPrimary, fontFamily: 'system-ui' }}>
-      <h1 style={{ fontSize: '28px', fontWeight: 'bold', margin: 0, marginBottom: '20px' }}>Completed Videos</h1>
+      <div style={{ position: 'relative', display: 'flex', justifyContent: 'center', alignItems: 'center', marginBottom: '32px' }}>
+        <h1 style={proHeadingStyle}>Published</h1>
+
+        <button
+          onClick={openDeleteAllConfirm}
+          disabled={loading || completedVideos.length === 0}
+          style={{
+            position: 'absolute',
+            right: 0,
+            padding: '10px 14px',
+            borderRadius: '10px',
+            border: '1px solid rgba(255,255,255,0.08)',
+            backgroundColor: 'rgba(239, 68, 68, 0.12)',
+            color: '#fff',
+            cursor: loading || completedVideos.length === 0 ? 'not-allowed' : 'pointer',
+            fontWeight: 800,
+            fontSize: '12px',
+            letterSpacing: '0.02em',
+            opacity: loading || completedVideos.length === 0 ? 0.4 : 1,
+            transition: 'opacity 0.2s, transform 0.2s',
+          }}
+          onMouseEnter={(e) => {
+            if (!e.currentTarget.disabled) e.currentTarget.style.transform = 'translateY(-1px)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = 'translateY(0)';
+          }}
+        >
+          Delete All
+        </button>
+      </div>
 
       {loading && <div>Loading...</div>}
 
@@ -108,74 +203,94 @@ function CompletedVideos() {
 
       {!loading && completedVideos.length > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxWidth: '1000px' }}>
-          {completedVideos.map(v => (
-            <div
-              key={v.id}
-              style={{
-                backgroundColor: COLORS.bgCard,
-                border: `1px solid ${COLORS.borderDefault}`,
-                borderLeft: `4px solid ${getTopicColor(v.topic_id)}`,
-                borderRadius: '8px',
-                padding: '12px 16px',
-                display: 'flex',
-                gap: '12px',
-                alignItems: 'center',
-                cursor: 'pointer',
-                transition: 'background 0.2s',
-              }}
-              onClick={() => setSelectedVideo(v)}
-              onMouseEnter={e => e.currentTarget.style.backgroundColor = '#222'}
-              onMouseLeave={e => e.currentTarget.style.backgroundColor = COLORS.bgCard}
-            >
-              {/* Topic Dot */}
-              <div style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: getTopicColor(v.topic_id), flexShrink: 0 }} />
-              
-              {/* Video Info */}
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontWeight: '600', fontSize: '14px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {v.video_title}
-                </div>
-                <div style={{ fontSize: '12px', color: COLORS.textSecondary, marginTop: '4px' }}>{getTopicName(v.topic_id)}</div>
-              </div>
+          {completedVideos.map((v) => {
+            const topicColor = getTopicColor(v.topic_id);
+            const hoverGlow = `0 0 26px ${hexToRgba(topicColor, 0.34)}`;
 
-              {/* Dates */}
-              <div style={{ display: 'flex', gap: '24px', fontSize: '12px', color: COLORS.textSecondary, minWidth: '300px', justifyContent: 'flex-end' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-                  <span style={{ fontSize: '10px', fontWeight: 'bold', color: '#666', textTransform: 'uppercase' }}>Date Added:</span>
-                  <span style={{ color: '#aaa' }}>{formatDate(v.original_added_at || v.created_at)}</span>
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-                  <span style={{ fontSize: '10px', fontWeight: 'bold', color: COLORS.accentGreen, textTransform: 'uppercase' }}>Date Completed:</span>
-                  <span style={{ color: COLORS.accentGreen }}>{formatDate(v.completed_at)}</span>
-                </div>
-              </div>
-
-              {/* Remove Button */}
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleRemove(v.id);
-                }}
+            return (
+              <div
+                key={v.id}
                 style={{
-                  background: 'none',
-                  border: 'none',
-                  color: COLORS.textSecondary,
-                  fontSize: '20px',
-                  cursor: 'pointer',
-                  padding: '4px 8px',
-                  borderRadius: '4px',
+                  backgroundColor: COLORS.bgCard,
+                  border: `1px solid ${COLORS.borderDefault}`,
+                  borderRadius: '8px',
+                  padding: '12px 16px',
                   display: 'flex',
+                  gap: '12px',
                   alignItems: 'center',
-                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  boxShadow: 'none',
+                  transition: 'box-shadow 180ms ease',
                 }}
-                title="Remove from completed"
-                onMouseEnter={e => e.currentTarget.style.color = COLORS.accentRed}
-                onMouseLeave={e => e.currentTarget.style.color = COLORS.textSecondary}
+                onClick={() => setSelectedVideo(v)}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.boxShadow = `${hoverGlow}, 0 0 0 1px rgba(255,255,255,0.03)`;
+                  const dot = e.currentTarget.querySelector('.completed-topic-dot');
+                  if (dot) {
+                    dot.style.boxShadow = `0 0 0 3px ${hexToRgba(topicColor, 0.12)}, 0 0 16px ${hexToRgba(topicColor, 0.35)}`;
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.boxShadow = 'none';
+                  const dot = e.currentTarget.querySelector('.completed-topic-dot');
+                  if (dot) {
+                    dot.style.boxShadow = 'none';
+                  }
+                }}
               >
-                ×
-              </button>
-            </div>
-          ))}
+                {/* Topic Dot */}
+                <div
+                  style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: topicColor, flexShrink: 0, boxShadow: 'none' }}
+                  className="completed-topic-dot"
+                />
+
+                {/* Video Info */}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: '600', fontSize: '14px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {v.video_title}
+                  </div>
+                  <div style={{ fontSize: '12px', color: COLORS.textSecondary, marginTop: '4px' }}>{getTopicName(v.topic_id)}</div>
+                </div>
+
+                {/* Dates */}
+                <div style={{ display: 'flex', gap: '24px', fontSize: '12px', color: COLORS.textSecondary, minWidth: '300px', justifyContent: 'flex-end' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+                    <span style={{ fontSize: '10px', fontWeight: 'bold', color: '#666', textTransform: 'uppercase' }}>Date Added:</span>
+                    <span style={{ color: '#aaa' }}>{formatDate(v.original_added_at || v.created_at)}</span>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+                    <span style={{ fontSize: '10px', fontWeight: 'bold', color: COLORS.accentGreen, textTransform: 'uppercase' }}>Date Completed:</span>
+                    <span style={{ color: COLORS.accentGreen }}>{formatDate(v.completed_at)}</span>
+                  </div>
+                </div>
+
+                {/* Remove Button */}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    openRemoveConfirm(v.id);
+                  }}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: COLORS.textSecondary,
+                    fontSize: '20px',
+                    cursor: 'pointer',
+                    padding: '4px 8px',
+                    borderRadius: '4px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                  title="Remove from completed"
+                  onMouseEnter={(e) => (e.currentTarget.style.color = COLORS.accentRed)}
+                  onMouseLeave={(e) => (e.currentTarget.style.color = COLORS.textSecondary)}
+                >
+                  ×
+                </button>
+              </div>
+            );
+          })}
         </div>
       )}
 
@@ -244,6 +359,102 @@ function CompletedVideos() {
       {toast && (
         <div style={{ position: 'fixed', bottom: '24px', right: '24px', padding: '12px 24px', borderRadius: '8px', backgroundColor: COLORS.accentGreen, color: '#fff', fontWeight: '700', zIndex: 3000 }}>
           {toast}
+        </div>
+      )}
+
+      {/* Confirm Modal */}
+      {confirmModal.open && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0,0,0,0.7)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 2000,
+            backdropFilter: 'blur(6px)',
+          }}
+          onClick={closeConfirm}
+        >
+          <div
+            style={{
+              width: '92%',
+              maxWidth: '520px',
+              backgroundColor: '#0f0f0f',
+              border: '1px solid rgba(255,255,255,0.08)',
+              borderRadius: '14px',
+              padding: '18px',
+              boxShadow: '0 20px 60px rgba(0,0,0,0.7)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px' }}>
+              <div>
+                <div style={{ fontSize: '16px', fontWeight: 900, color: '#fff' }}>
+                  {confirmModal.type === 'all' ? 'Delete all completed videos?' : 'Remove from completed?'}
+                </div>
+                <div style={{ marginTop: '6px', fontSize: '12px', color: '#999', lineHeight: 1.4 }}>
+                  {confirmModal.type === 'all'
+                    ? 'This will move every completed video to Deleted Videos.'
+                    : 'This will move the video to Deleted Videos.'}
+                </div>
+              </div>
+
+              <button
+                onClick={closeConfirm}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: '#777',
+                  fontSize: '22px',
+                  cursor: 'pointer',
+                  lineHeight: 1,
+                  padding: '2px 6px',
+                }}
+                aria-label="Close"
+              >
+                ×
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '16px' }}>
+              <button
+                onClick={closeConfirm}
+                disabled={confirmModal.busy}
+                style={{
+                  padding: '10px 14px',
+                  borderRadius: '10px',
+                  border: '1px solid rgba(255,255,255,0.08)',
+                  backgroundColor: 'rgba(255,255,255,0.04)',
+                  color: '#fff',
+                  cursor: confirmModal.busy ? 'not-allowed' : 'pointer',
+                  fontWeight: 800,
+                  fontSize: '12px',
+                  opacity: confirmModal.busy ? 0.6 : 1,
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirm}
+                disabled={confirmModal.busy}
+                style={{
+                  padding: '10px 14px',
+                  borderRadius: '10px',
+                  border: '1px solid rgba(255,255,255,0.08)',
+                  backgroundColor: 'rgba(239, 68, 68, 0.85)',
+                  color: '#fff',
+                  cursor: confirmModal.busy ? 'not-allowed' : 'pointer',
+                  fontWeight: 900,
+                  fontSize: '12px',
+                  opacity: confirmModal.busy ? 0.7 : 1,
+                }}
+              >
+                {confirmModal.busy ? 'Working…' : 'Confirm'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

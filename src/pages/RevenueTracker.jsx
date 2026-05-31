@@ -324,7 +324,14 @@ function RevenueTracker() {
     <div style={containerStyle}>
       <div style={headerStyle}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-          <h2 style={{ margin: 0 }}>Revenue <span style={{ color: '#22c55e' }}>Tracker</span></h2>
+          <h1 style={{
+            margin: 0,
+            fontSize: '32px',
+            fontWeight: 900,
+            letterSpacing: '0.05em',
+            color: '#fff',
+            fontFamily: '"Inter", system-ui, sans-serif',
+          }}>Monetization ( Revenue Tracker)</h1>
           <div style={yearToggleStyle}>
             <button style={arrowButtonStyle} onClick={() => setYear(prev => prev - 1)}>◄</button>
             <span style={{ fontSize: '18px', fontWeight: 'bold', width: '60px', textAlign: 'center' }}>{year}</span>

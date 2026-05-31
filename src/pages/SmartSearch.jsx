@@ -217,6 +217,21 @@ export default function SmartSearch() {
     position: 'relative'
   };
 
+  const proHeadingStyle = {
+    fontSize: '42px',
+    fontWeight: 900,
+    textTransform: 'uppercase',
+    textAlign: 'center',
+    letterSpacing: '0.15em',
+    background: 'linear-gradient(to bottom, #ffffff 30%, #555555 100%)',
+    WebkitBackgroundClip: 'text',
+    WebkitTextFillColor: 'transparent',
+    filter: 'drop-shadow(0px 8px 16px rgba(255,255,255,0.1))',
+    margin: 0,
+    marginBottom: '28px',
+    fontFamily: '"Inter", system-ui, sans-serif',
+  };
+
   const searchContainerStyle = {
     position: 'fixed',
     top: isSearched ? '20px' : '50%',
@@ -225,13 +240,17 @@ export default function SmartSearch() {
     width: isSearched ? '600px' : '700px',
     height: 'auto',
     transition: 'all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
-    zIndex: 100
+    zIndex: 100,
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
   };
 
   const searchInputStyle = {
     width: '100%',
     height: '100%',
-    padding: '15px 18px',
+    boxSizing: 'border-box',
+    padding: '12px 48px 12px 18px',
     fontSize: isSearched ? '14px' : '16px',
     backgroundColor: '#1a1a1a',
     border: '1px solid #3b82f6',
@@ -248,7 +267,11 @@ export default function SmartSearch() {
     top: '50%',
     transform: 'translateY(-50%)',
     cursor: 'pointer',
-    fontSize: '20px',
+    width: '28px',
+    height: '28px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
     color: '#3b82f6'
   };
 
@@ -466,7 +489,10 @@ export default function SmartSearch() {
 
       {/* Search Bar */}
       <div style={searchContainerStyle}>
-        <div style={{ position: 'relative', width: '100%', height: isSearched ? '45px' : '55px' }}>
+        {!isSearched && (
+          <h1 style={proHeadingStyle}>Smart Search</h1>
+        )}
+        <div style={{ position: 'relative', width: '100%', height: isSearched ? '40px' : '48px' }}>
           <input
             type="text"
             placeholder="Search across your topics..."
@@ -476,7 +502,20 @@ export default function SmartSearch() {
             style={searchInputStyle}
           />
           <div style={searchIconStyle} onClick={handleSearch}>
-            🔍
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <circle cx="11" cy="11" r="7" />
+              <line x1="21" y1="21" x2="16.65" y2="16.65" />
+            </svg>
           </div>
         </div>
 
@@ -547,7 +586,7 @@ export default function SmartSearch() {
               onChange={() => toggleTopic(topic.id)}
               style={checkboxStyle}
             />
-            <span style={colorDotStyle} style={{...colorDotStyle, backgroundColor: getTopicColor(topic)}}></span>
+            <span style={{...colorDotStyle, backgroundColor: getTopicColor(topic)}}></span>
             {topic.name}
           </label>
         ))}

@@ -1,5 +1,21 @@
 import axios from 'axios'
 
+/** In-memory cache: handle -> { channelId, uploadsPlaylistId } */
+const channelCache = new Map()
+
+export class YouTubeQuotaError extends Error {
+  constructor(message = 'YouTube API daily quota exceeded. Try again tomorrow or use a new API key.') {
+    super(message)
+    this.name = 'YouTubeQuotaError'
+  }
+}
+
+function isQuotaExceededError(err) {
+  const status = err?.response?.status
+  const message = String(err?.response?.data?.error?.message ?? '')
+  return status === 403 || status === 429 || /quota/i.test(message)
+}
+
 /**
  * If URL contains "@", take everything after the last "@"
  * (stops at / ? & or whitespace). If no "@", strip a leading "@"
@@ -31,9 +47,7 @@ async function fetchSearchWithStats(searchQuery, daysAgo = 2, channelId = null, 
 
   const params = {
     part: 'snippet',
-    q: searchQuery,
     type: 'video',
-    videoDuration: 'medium',
     order: 'viewCount',
     publishedAfter,
     maxResults,
@@ -41,7 +55,12 @@ async function fetchSearchWithStats(searchQuery, daysAgo = 2, channelId = null, 
   }
 
   if (channelId) {
+    // Channel-scoped search: omit q so we get all uploads from the channel,
+    // not only videos whose title/description mention the handle.
     params.channelId = channelId
+  } else {
+    params.q = searchQuery
+    params.videoDuration = 'medium'
   }
 
   const { data } = await axios.get('https://www.googleapis.com/youtube/v3/search', { params })
@@ -112,6 +131,148 @@ async function fetchSearchWithStats(searchQuery, daysAgo = 2, channelId = null, 
   })
 }
 
+function mapStatsOntoItems(items, getVideoId) {
+  return items.map((item) => {
+    const videoId = getVideoId(item)
+    const videoDetails = item._videoDetails
+    const stats = videoDetails?.statistics
+    const durationStr = videoDetails?.contentDetails?.duration || ''
+    const mergedSnippet = {
+      ...(item?.snippet ?? {}),
+      ...(videoDetails?.snippet ?? {}),
+    }
+
+    const viewCount = stats?.viewCount != null ? Number(stats.viewCount) : 0
+    const likeCount = stats?.likeCount != null ? Number(stats.likeCount) : 0
+    const commentCount = stats?.commentCount != null ? Number(stats.commentCount) : 0
+    const description = mergedSnippet?.description ?? ''
+
+    return {
+      id: { videoId },
+      snippet: mergedSnippet,
+      durationStr,
+      statistics: { viewCount, likeCount, commentCount },
+      viewCount,
+      likeCount,
+      commentCount,
+      description,
+    }
+  })
+}
+
+async function fetchVideoStats(videoIds, apiKey) {
+  if (videoIds.length === 0) return new Map()
+
+  const { data: statsData } = await axios.get('https://www.googleapis.com/youtube/v3/videos', {
+    params: {
+      part: 'statistics,snippet,contentDetails',
+      id: videoIds.join(','),
+      key: apiKey,
+    },
+  })
+
+  return new Map((statsData?.items ?? []).map((v) => [v?.id, v]))
+}
+
+function filterNonShortVideos(items) {
+  return items.filter((item) => {
+    const dur = item.durationStr || ''
+    const isShortDuration = dur.startsWith('PT') && !dur.includes('M') && !dur.includes('H')
+    return !isShortDuration
+  })
+}
+
+/** Resolve handle via channels.list (1 quota unit). Falls back to search only if needed. */
+async function resolveChannel(handleWithAt, apiKey) {
+  const cacheKey = handleWithAt.toLowerCase()
+  if (channelCache.has(cacheKey)) return channelCache.get(cacheKey)
+
+  try {
+    const { data } = await axios.get('https://www.googleapis.com/youtube/v3/channels', {
+      params: { part: 'id,contentDetails', forHandle: handleWithAt, key: apiKey },
+    })
+    const item = data?.items?.[0]
+    if (item?.id) {
+      const resolved = {
+        channelId: item.id,
+        uploadsPlaylistId: item.contentDetails?.relatedPlaylists?.uploads ?? null,
+      }
+      channelCache.set(cacheKey, resolved)
+      return resolved
+    }
+  } catch (err) {
+    if (isQuotaExceededError(err)) throw new YouTubeQuotaError()
+    console.warn(
+      `resolveChannel: channels.list failed for "${handleWithAt}", trying search fallback`,
+      err.response?.data?.error?.message ?? err.message,
+    )
+  }
+
+  // Fallback: search.list costs 100 units — only when channels.list returns nothing.
+  try {
+    const { data } = await axios.get('https://www.googleapis.com/youtube/v3/search', {
+      params: {
+        part: 'snippet',
+        q: handleWithAt,
+        type: 'channel',
+        maxResults: 1,
+        key: apiKey,
+      },
+    })
+    const channelId = data?.items?.[0]?.id?.channelId
+    if (!channelId) return null
+
+    const { data: channelData } = await axios.get('https://www.googleapis.com/youtube/v3/channels', {
+      params: { part: 'contentDetails', id: channelId, key: apiKey },
+    })
+    const resolved = {
+      channelId,
+      uploadsPlaylistId: channelData?.items?.[0]?.contentDetails?.relatedPlaylists?.uploads ?? null,
+    }
+    channelCache.set(cacheKey, resolved)
+    return resolved
+  } catch (err) {
+    if (isQuotaExceededError(err)) throw new YouTubeQuotaError()
+    throw err
+  }
+}
+
+/** Fetch recent uploads via playlistItems (1 unit) + videos stats (1 unit). */
+async function fetchChannelUploadsWithStats(uploadsPlaylistId, daysAgo, maxResults, apiKey) {
+  const publishedAfterMs = Date.now() - daysAgo * 24 * 60 * 60 * 1000
+
+  const { data: playlistData } = await axios.get('https://www.googleapis.com/youtube/v3/playlistItems', {
+    params: {
+      part: 'snippet,contentDetails',
+      playlistId: uploadsPlaylistId,
+      maxResults: 50,
+      key: apiKey,
+    },
+  })
+
+  const rawItems = (playlistData?.items ?? []).filter((item) => {
+    const publishedAt = new Date(item?.snippet?.publishedAt ?? 0).getTime()
+    if (publishedAt < publishedAfterMs) return false
+    return !isShortByTitle({ snippet: item.snippet })
+  })
+
+  if (rawItems.length === 0) return []
+
+  const videoIds = rawItems.map((item) => item?.snippet?.resourceId?.videoId).filter(Boolean)
+  const statsById = await fetchVideoStats(videoIds, apiKey)
+
+  const withStats = rawItems.map((item) => ({
+    ...item,
+    _videoDetails: statsById.get(item?.snippet?.resourceId?.videoId),
+  }))
+
+  const mappedItems = mapStatsOntoItems(withStats, (item) => item?.snippet?.resourceId?.videoId)
+
+  return filterNonShortVideos(mappedItems)
+    .sort((a, b) => b.viewCount - a.viewCount)
+    .slice(0, maxResults)
+}
+
 export async function searchByKeywords(topic, _contentType = 'videos', daysAgo = 2, maxResults = 12) {
   try {
     const q = String(topic ?? '').trim()
@@ -126,21 +287,40 @@ export async function searchByKeywords(topic, _contentType = 'videos', daysAgo =
 export async function searchByChannel(channelUrlOrHandle, _contentType = 'videos', daysAgo = 2, maxResults = 12) {
   try {
     const handle = extractHandleForChannelSearch(channelUrlOrHandle)
-    if (!handle) return []
+    if (!handle) {
+      console.warn('searchByChannel: no handle extracted from input', channelUrlOrHandle)
+      return []
+    }
 
     const apiKey = import.meta.env.VITE_YOUTUBE_API_KEY
-    const handleWithAt = handle.startsWith('@') ? handle : `@${handle}`
-    
-    // Resolve channel handle to channelId
-    const { data: channelData } = await axios.get('https://www.googleapis.com/youtube/v3/channels', {
-      params: { part: 'id', forHandle: handleWithAt, key: apiKey }
-    }).catch(() => ({ data: null }))
-    
-    const channelId = channelData?.items?.[0]?.id
+    if (!apiKey) {
+      console.error('searchByChannel: YouTube API key not found')
+      return []
+    }
 
-    return await fetchSearchWithStats(handle, daysAgo, channelId, maxResults)
+    const handleWithAt = handle.startsWith('@') ? handle : `@${handle}`
+
+    const channel = await resolveChannel(handleWithAt, apiKey)
+    if (!channel?.channelId) {
+      console.error(`searchByChannel: no channel found for handle "${handleWithAt}"`)
+      return []
+    }
+
+    if (channel.uploadsPlaylistId) {
+      return await fetchChannelUploadsWithStats(
+        channel.uploadsPlaylistId,
+        daysAgo,
+        maxResults,
+        apiKey,
+      )
+    }
+
+    // Last resort if uploads playlist is missing.
+    return await fetchSearchWithStats('', daysAgo, channel.channelId, maxResults)
   } catch (e) {
-    console.log(e)
+    if (e instanceof YouTubeQuotaError) throw e
+    if (isQuotaExceededError(e)) throw new YouTubeQuotaError()
+    console.error('searchByChannel: unexpected error', e)
     return []
   }
 }

@@ -26,8 +26,6 @@ const getMonday = (date) => {
 const InlineScheduler = ({ video, onSave, onCancel }) => {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDateStr, setSelectedDateStr] = useState(null);
-  const [selectedTime, setSelectedTime] = useState({ hour: '00', minute: '00' });
-  const [isTimeSelected, setIsTimeSelected] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
   const calendarGrid = useMemo(() => {
@@ -67,9 +65,7 @@ const InlineScheduler = ({ video, onSave, onCancel }) => {
         created_at: localDate.toISOString() 
       };
 
-      if (isTimeSelected) {
-        updateObj.scheduled_time = `${selectedTime.hour}:${selectedTime.minute}`;
-      }
+
 
       const { error } = await supabase
         .from('planner_videos')
@@ -77,10 +73,7 @@ const InlineScheduler = ({ video, onSave, onCancel }) => {
         .eq('id', video.id);
 
       if (error) throw error;
-      
-      const timeDisplay = isTimeSelected ? ` at ${format12h(selectedTime.hour, selectedTime.minute)}` : '';
-      alert(`✅ Video scheduled for ${selectedDateStr}${timeDisplay}`);
-      onSave(video.id);
+      onSave(video.id, selectedDateStr);
     } catch (err) {
       console.error(err);
       alert('Failed to schedule.');
@@ -89,42 +82,35 @@ const InlineScheduler = ({ video, onSave, onCancel }) => {
     }
   };
 
-  const format12h = (h, m) => {
-    const hh = parseInt(h);
-    const ampm = hh >= 12 ? 'PM' : 'AM';
-    const h12 = hh % 12 || 12;
-    return `${h12}:${m} ${ampm}`;
-  };
-
   const dayOfWeek = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
-  const hoursArr = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0'));
-  const minutesArr = ['00', '15', '30', '45'];
 
   return (
     <div style={{
       width: '100%',
-      backgroundColor: '#111',
-      borderRadius: '8px',
-      border: `1px solid ${COLORS.border}`,
-      padding: '12px',
+      backgroundColor: '#0c0c0c',
+      borderRadius: '16px',
+      border: `1px solid rgba(239, 68, 68, 0.4)`,
+      padding: '18px',
       display: 'flex',
       flexDirection: 'column',
-      gap: '12px',
+      gap: '16px',
       zIndex: 1,
+      boxShadow: '0 0 30px rgba(239, 68, 68, 0.2), 0 20px 60px rgba(0,0,0,0.7)',
+      boxSizing: 'border-box'
     }} onClick={(e) => e.stopPropagation()}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#fff' }}>
-          {currentMonth.toLocaleString('default', { month: 'short', year: 'numeric' })}
+        <div style={{ fontSize: '15px', fontWeight: 950, color: '#fff', letterSpacing: '-0.02em' }}>
+          {currentMonth.toLocaleString('default', { month: 'long', year: 'numeric' })}
         </div>
-        <div style={{ display: 'flex', gap: '4px' }}>
-          <button onClick={handlePrevMonth} style={{ background: '#222', border: '1px solid #333', color: '#fff', borderRadius: '4px', padding: '2px 6px', fontSize: '10px', cursor: 'pointer' }}>←</button>
-          <button onClick={handleNextMonth} style={{ background: '#222', border: '1px solid #333', color: '#fff', borderRadius: '4px', padding: '2px 6px', fontSize: '10px', cursor: 'pointer' }}>→</button>
+        <div style={{ display: 'flex', gap: '6px' }}>
+          <button onClick={handlePrevMonth} style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid #333', color: '#fff', borderRadius: '6px', padding: '4px 8px', fontSize: '12px', cursor: 'pointer', transition: 'all 0.2s' }}>←</button>
+          <button onClick={handleNextMonth} style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid #333', color: '#fff', borderRadius: '6px', padding: '4px 8px', fontSize: '12px', cursor: 'pointer', transition: 'all 0.2s' }}>→</button>
         </div>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '1px' }}>
         {dayOfWeek.map((d, i) => (
-          <div key={i} style={{ textAlign: 'center', fontSize: '9px', color: '#555', fontWeight: 'bold' }}>{d}</div>
+          <div key={i} style={{ textAlign: 'center', fontSize: '11px', color: '#666', fontWeight: 600, paddingBottom: '8px' }}>{d}</div>
         ))}
         {calendarGrid.map((d, i) => {
           const isSelected = selectedDateStr === d.dateStr;
@@ -138,12 +124,13 @@ const InlineScheduler = ({ video, onSave, onCancel }) => {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                fontSize: '10px',
-                borderRadius: '2px',
+                fontSize: '12px',
+                borderRadius: '6px',
                 cursor: d.isCurrentMonth ? 'pointer' : 'default',
                 backgroundColor: isSelected ? COLORS.accent : 'transparent',
-                color: isSelected ? '#fff' : (d.isCurrentMonth ? (isToday ? COLORS.accent : '#ccc') : '#444'),
-                fontWeight: isToday ? 'bold' : 'normal'
+                color: isSelected ? '#fff' : (d.isCurrentMonth ? (isToday ? COLORS.accent : '#eee') : '#444'),
+                fontWeight: isToday ? 800 : 500,
+                transition: 'all 0.2s',
               }}
             >
               {d.day}
@@ -152,58 +139,28 @@ const InlineScheduler = ({ video, onSave, onCancel }) => {
         })}
       </div>
 
-      <div style={{ borderTop: '1px solid #222', paddingTop: '10px' }}>
-        <div style={{ fontSize: '11px', color: isTimeSelected ? '#888' : '#444', marginBottom: '8px' }}>
-          Time (Optional - {isTimeSelected ? 'Selected' : 'None'}):
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', opacity: isTimeSelected ? 1 : 0.5 }}>
-          <select 
-            style={{ backgroundColor: '#1a1a1a', color: '#fff', border: '1px solid #333', padding: '6px 8px', borderRadius: '4px', fontSize: '13px', cursor: 'pointer', flex: 1 }} 
-            value={selectedTime.hour} 
-            onChange={(e) => {
-              setSelectedTime({ ...selectedTime, hour: e.target.value });
-              setIsTimeSelected(true);
-            }}
-          >
-            {hoursArr.map(h => <option key={h} value={h}>{h}</option>)}
-          </select>
-          <span style={{ color: '#888' }}>:</span>
-          <select 
-            style={{ backgroundColor: '#1a1a1a', color: '#fff', border: '1px solid #333', padding: '6px 8px', borderRadius: '4px', fontSize: '13px', cursor: 'pointer', flex: 1 }} 
-            value={selectedTime.minute} 
-            onChange={(e) => {
-              setSelectedTime({ ...selectedTime, minute: e.target.value });
-              setIsTimeSelected(true);
-            }}
-          >
-            {minutesArr.map(m => <option key={m} value={m}>{m}</option>)}
-          </select>
-        </div>
-        {selectedDateStr && (
-          <div style={{ fontSize: '10px', color: COLORS.accent, marginTop: '8px', textAlign: 'center' }}>
-            {selectedDateStr} {isTimeSelected ? `at ${format12h(selectedTime.hour, selectedTime.minute)}` : ''}
-          </div>
-        )}
-      </div>
 
-      <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
+
+      <div style={{ display: 'flex', gap: '12px', marginTop: '10px' }}>
         <button 
           onClick={(e) => { e.stopPropagation(); onCancel(); }}
-          style={{ flex: 1, padding: '8px', background: 'transparent', border: '1px solid #333', color: '#888', borderRadius: '6px', fontSize: '11px', cursor: 'pointer' }}
+          style={{ flex: 1, padding: '12px', background: 'transparent', border: '1px solid #333', color: '#fff', borderRadius: '10px', fontSize: '14px', fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s' }}
         >Cancel</button>
         <button 
           onClick={handleSave}
           disabled={!selectedDateStr || isSaving}
           style={{ 
             flex: 1,
-            padding: '8px', 
+            padding: '12px', 
             background: selectedDateStr ? COLORS.accent : '#222', 
-            color: selectedDateStr ? '#fff' : '#555', 
+            color: '#fff', 
             border: 'none', 
-            borderRadius: '6px', 
-            fontSize: '11px', 
-            fontWeight: 'bold', 
-            cursor: selectedDateStr ? 'pointer' : 'not-allowed' 
+            borderRadius: '10px', 
+            fontSize: '14px', 
+            fontWeight: 800, 
+            cursor: selectedDateStr ? 'pointer' : 'not-allowed',
+            transition: 'all 0.2s',
+            boxShadow: selectedDateStr ? '0 4px 12px rgba(239, 68, 68, 0.3)' : 'none'
           }}
         >
           {isSaving ? '...' : 'Save Schedule'}

@@ -16,6 +16,7 @@ import Status from './pages/Status'
 import DeletedVideos from './pages/DeletedVideos'
 import SmartSearch from './pages/SmartSearch'
 import Landing from './pages/Landing'
+import Login from './pages/Login'
 import CompletedVideos from './pages/CompletedVideos'
 import TopicRevenueDetail from './pages/TopicRevenueDetail'
 import { deleteOldDeletedVideos } from './lib/autoDeleteOldVideos'
@@ -63,6 +64,7 @@ function App() {
   return (
 
     <Routes>
+      <Route path="/login" element={<Login />} />
       <Route element={<AppLayout />}>
         <Route path="/" element={<Landing />} />
         <Route path="/home" element={<Home />} />

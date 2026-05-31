@@ -89,20 +89,7 @@ const openButtonStyle = {
   color: '#000',
 };
 
-const plusCardStyle = {
-  ...cardStyle,
-  border: '2px dashed #444',
-  backgroundColor: 'transparent',
-  alignItems: 'center',
-  justifyContent: 'center',
-  cursor: 'default'
-};
 
-const plusIconStyle = {
-  fontSize: '48px',
-  color: '#555',
-  margin: 0
-};
 
 const modalOverlayStyle = {
   position: 'fixed',
@@ -240,9 +227,7 @@ const Brainstorm = () => {
           );
         })}
         
-        <div style={plusCardStyle} title="Auto-created with topics">
-          <span style={plusIconStyle}>+</span>
-        </div>
+
       </div>
 
       {showModal && (

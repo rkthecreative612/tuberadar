@@ -37,12 +37,14 @@ const AddChannel = () => {
   const containerStyle = {
     display: 'flex',
     flexDirection: 'column',
+    alignItems: 'center',
     width: '100%',
     minHeight: '100vh',
     backgroundColor: '#0f0f0f',
-    fontFamily: 'sans-serif',
+    backgroundImage: 'radial-gradient(circle at 50% -20%, #1e1e1e 0%, #0f0f0f 80%)',
+    fontFamily: 'Inter, sans-serif',
     color: 'white',
-    padding: '40px',
+    padding: '40px 20px',
     boxSizing: 'border-box',
     overflowY: 'auto'
   };
@@ -55,14 +57,19 @@ const AddChannel = () => {
   };
 
   const backButtonStyle = {
-    padding: '8px 12px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    padding: '10px 16px',
     fontSize: '14px',
-    color: '#ccc',
-    backgroundColor: 'transparent',
-    border: '1px solid #444',
-    borderRadius: '6px',
+    color: '#fff',
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    border: '1px solid rgba(255, 255, 255, 0.1)',
+    borderRadius: '10px',
     cursor: 'pointer',
-    fontWeight: 600
+    fontWeight: 600,
+    transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+    backdropFilter: 'blur(10px)',
   };
 
   const titleStyle = {
@@ -251,10 +258,17 @@ const AddChannel = () => {
 
   return (
     <div style={containerStyle}>
-      <div style={topBarStyle}>
-        <button style={backButtonStyle} onClick={() => navigate(-1)}>&larr; Back</button>
-        <h1 style={titleStyle}>Add Your Channel</h1>
-      </div>
+      <div style={{ width: '100%', maxWidth: '800px' }}>
+        <div style={topBarStyle}>
+          <button 
+            className="back-btn"
+            style={backButtonStyle} 
+            onClick={() => navigate(-1)}
+          >
+            Back
+          </button>
+          <h1 style={titleStyle}>Add Your Channel</h1>
+        </div>
 
       <div style={formSectionStyle}>
         {error && <div style={{ color: '#ff5252', marginBottom: '10px', fontWeight: 'bold' }}>{error}</div>}
@@ -273,11 +287,29 @@ const AddChannel = () => {
         <div style={inputGroupStyle}>
           <label style={labelStyle}>Channel Icon</label>
           
-          <div style={{ 
-            display: 'flex', flexWrap: 'wrap', gap: '8px',
-            backgroundColor: '#0a0a0a', padding: '12px', borderRadius: '12px', border: '1px solid #333',
-            justifyContent: 'center'
-          }}>
+          <div 
+            className="hide-scrollbar"
+            style={{ 
+              display: 'flex', flexWrap: 'nowrap', gap: '8px',
+              backgroundColor: '#0a0a0a', padding: '12px', borderRadius: '12px', border: '1px solid #333',
+              justifyContent: 'center', overflowX: 'auto', width: '100%', boxSizing: 'border-box'
+            }}
+          >
+            <div 
+              onClick={() => setIconValue('')}
+              className="emoji-item"
+              style={{
+                fontSize: '18px', width: '36px', height: '36px', display: 'flex', 
+                alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+                borderRadius: '8px', transition: 'all 0.2s',
+                border: iconValue === '' ? '2px solid #22c55e' : '1px solid transparent',
+                backgroundColor: iconValue === '' ? 'rgba(34, 197, 94, 0.1)' : '#1a1a1a',
+              }}
+            >
+              <span style={{ fontSize: '16px', fontWeight: 'bold', color: iconValue === '' ? '#22c55e' : '#888' }}>
+                {channelName ? channelName.charAt(0).toUpperCase() : 'A'}
+              </span>
+            </div>
             {EMOJIS.map(emoji => (
               <div 
                 key={emoji}
@@ -298,6 +330,18 @@ const AddChannel = () => {
               .emoji-item:hover {
                 background-color: #2a2a2a !important;
                 transform: scale(1.1);
+              }
+              .hide-scrollbar::-webkit-scrollbar {
+                display: none;
+              }
+              .hide-scrollbar {
+                -ms-overflow-style: none;
+                scrollbar-width: none;
+              }
+              .back-btn:hover {
+                background-color: rgba(255, 255, 255, 0.1) !important;
+                border-color: rgba(255, 255, 255, 0.2) !important;
+                transform: translateX(-4px);
               }
             `}</style>
           </div>
@@ -371,6 +415,7 @@ const AddChannel = () => {
         <button style={saveButtonStyle} onClick={handleSave} disabled={loading}>
           {loading ? 'Saving...' : 'Save Channel'}
         </button>
+        </div>
       </div>
     </div>
   );

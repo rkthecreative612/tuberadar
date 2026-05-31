@@ -108,7 +108,8 @@ const modalContentStyle = {
   display: 'flex',
   flexDirection: 'column',
   gap: '20px',
-  position: 'relative'
+  position: 'relative',
+  boxSizing: 'border-box'
 };
 
 const inputGroupStyle = {
@@ -284,7 +285,7 @@ const Home = () => {
     setEditName(ch.name);
     setEditUrl(ch.description || '');
     setEditColor(ch.color || getFallbackColor(channels, ch));
-    setEditIconValue(ch.icon || '🎬');
+    setEditIconValue(ch.icon ?? '🎬');
     
     // Fetch competitors
     const { data, error } = await supabase
@@ -509,8 +510,8 @@ const Home = () => {
           z-index: 10;
         }
       `}</style>
-      <div style={{ marginBottom: '40px' }}>
-        <h1 style={{ fontSize: '32px', fontWeight: 'bold', margin: 0 }}>Welcome, RK 👋</h1>
+      <div style={{ marginBottom: '40px', textAlign: 'center' }}>
+        <h1 style={{ fontSize: '42px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.15em', background: 'linear-gradient(to bottom, #ffffff 30%, #555555 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', filter: 'drop-shadow(0px 8px 16px rgba(255,255,255,0.1))', margin: 0, fontFamily: '"Inter", system-ui, sans-serif' }}>Channels</h1>
       </div>
 
       <div style={centerAreaStyle}>
@@ -562,7 +563,36 @@ const Home = () => {
       {/* EDIT MODAL */}
       {editingChannel && !showDeleteConfirm && (
         <div style={modalOverlayStyle} onClick={() => setEditingChannel(null)}>
-          <div style={modalContentStyle} onClick={e => e.stopPropagation()}>
+          <div
+            className="color-shift-modal"
+            style={{
+              width: '100%',
+              maxWidth: modalContentStyle.maxWidth,
+              maxHeight: modalContentStyle.maxHeight,
+              borderRadius: modalContentStyle.borderRadius,
+              overflow: 'visible',
+              padding: '2px',
+              boxSizing: 'border-box',
+              background: 'linear-gradient(90deg, #22d3ee, #22c55e, #a855f7, #22d3ee)',
+              backgroundSize: '300% 300%',
+              display: 'flex',
+              flexDirection: 'column',
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div
+              style={{
+                ...modalContentStyle,
+                width: '100%',
+                maxWidth: 'none',
+                maxHeight: '100%',
+                flex: 1,
+                border: 'none',
+                // Outer frame padding is 2px, so reduce inner radius to keep corners perfectly aligned
+                borderRadius: '14px',
+                overflowX: 'hidden',
+              }}
+            >
             <h2 style={{ margin: 0, fontSize: '22px' }}>Edit Channel</h2>
             
             <div style={inputGroupStyle}>
@@ -579,11 +609,29 @@ const Home = () => {
             <div style={inputGroupStyle}>
               <label style={labelStyle}>Channel Icon</label>
               
-              <div style={{ 
-                display: 'flex', flexWrap: 'wrap', gap: '8px',
-                backgroundColor: '#0a0a0a', padding: '10px', borderRadius: '12px', border: '1px solid #333',
-                justifyContent: 'center'
-              }}>
+              <div 
+                className="hide-scrollbar"
+                style={{ 
+                  display: 'flex', flexWrap: 'nowrap', gap: '8px',
+                  backgroundColor: '#0a0a0a', padding: '10px', borderRadius: '12px', border: '1px solid #333',
+                  justifyContent: 'center', overflowX: 'auto', width: '100%', boxSizing: 'border-box'
+                }}
+              >
+                <div 
+                  onClick={() => setEditIconValue('')}
+                  className="modal-emoji-item"
+                  style={{
+                    fontSize: '16px', width: '32px', height: '32px', display: 'flex',
+                    alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+                    borderRadius: '6px', transition: 'all 0.2s',
+                    border: editIconValue === '' ? '2px solid #22c55e' : '1px solid transparent',
+                    backgroundColor: editIconValue === '' ? 'rgba(34, 197, 94, 0.1)' : '#111',
+                  }}
+                >
+                  <span style={{ fontSize: '14px', fontWeight: 'bold', color: editIconValue === '' ? '#22c55e' : '#888' }}>
+                    {editName ? editName.charAt(0).toUpperCase() : 'A'}
+                  </span>
+                </div>
                 {EMOJIS.map(emoji => (
                   <div 
                     key={emoji}
@@ -604,6 +652,13 @@ const Home = () => {
                   .modal-emoji-item:hover {
                     background-color: #2a2a2a !important;
                     transform: scale(1.1);
+                  }
+                  .hide-scrollbar::-webkit-scrollbar {
+                    display: none;
+                  }
+                  .hide-scrollbar {
+                    -ms-overflow-style: none;
+                    scrollbar-width: none;
                   }
                 `}</style>
               </div>
@@ -703,6 +758,49 @@ const Home = () => {
                 Delete Channel
               </button>
             </div>
+            </div>
+
+            <style>{`
+              @keyframes colorShiftGlow {
+                0% { background-position: 0% 50%; }
+                50% { background-position: 100% 50%; }
+                100% { background-position: 0% 50%; }
+              }
+
+              .color-shift-modal {
+                position: relative;
+                border-radius: 16px;
+                isolation: isolate;
+                animation: colorShiftGlow 8s ease-in-out infinite;
+              }
+
+              /* Tight sharp glow for the border itself */
+              .color-shift-modal::before {
+                content: "";
+                position: absolute;
+                inset: -1px;
+                border-radius: 17px; /* 16px + 1px */
+                background: inherit;
+                filter: blur(4px);
+                opacity: 0.9;
+                z-index: -1;
+                animation: colorShiftGlow 8s ease-in-out infinite;
+              }
+
+              /* Soft atmospheric bloom */
+              .color-shift-modal::after {
+                content: "";
+                position: absolute;
+                inset: -20px;
+                border-radius: 36px; /* 16px + 20px */
+                background: inherit;
+                filter: blur(30px);
+                opacity: 0.45;
+                z-index: -2;
+                animation: colorShiftGlow 8s ease-in-out infinite;
+                pointer-events: none;
+              }
+            `}</style>
           </div>
         </div>
       )}

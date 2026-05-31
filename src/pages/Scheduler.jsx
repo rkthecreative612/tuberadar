@@ -415,11 +415,62 @@ const Scheduler = () => {
         ::-webkit-scrollbar-thumb { background: #222; border-radius: 10px; border: 2px solid #0f0f0f; }
         ::-webkit-scrollbar-thumb:hover { background: #333; }
 
-        .list-row { transition: all 0.2s; cursor: pointer; border-bottom: 1px solid #1a1a1a; }
-        .list-row:hover { background-color: rgba(255,255,255,0.02); }
-        .list-header { border-bottom: 2px solid #333; }
-        .list-header th { text-align: left; padding: 16px; font-size: 11px; color: #666; font-weight: 900; letter-spacing: 0.05em; text-transform: uppercase; }
-        .list-cell { padding: 20px 16px; font-size: 14px; position: relative; }
+        .list-row { 
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); 
+          cursor: pointer; 
+          border-bottom: 1px solid rgba(255,255,255,0.03);
+          background: transparent;
+          position: relative;
+        }
+        .list-row:hover { 
+          background-color: rgba(255,255,255,0.03); 
+          transform: translateX(4px);
+        }
+        .list-row:hover .row-accent {
+          height: 70%;
+          opacity: 1;
+        }
+        .list-header { 
+          border-bottom: 1px solid #222; 
+        }
+        .list-header th { 
+          text-align: left; 
+          padding: 20px 16px; 
+          font-size: 10px; 
+          color: #555; 
+          font-weight: 800; 
+          letter-spacing: 0.15em; 
+          text-transform: uppercase; 
+        }
+        .list-cell { 
+          padding: 16px; 
+          font-size: 14px; 
+          position: relative; 
+          vertical-align: middle;
+        }
+        
+        .row-accent {
+          position: absolute;
+          left: 0;
+          top: 50%;
+          transform: translateY(-50%);
+          width: 3px;
+          height: 30%;
+          border-radius: 0 4px 4px 0;
+          transition: all 0.3s ease;
+          opacity: 0.6;
+        }
+
+        .category-badge {
+          padding: 4px 10px;
+          border-radius: 6px;
+          font-size: 10px;
+          font-weight: 800;
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+          background: rgba(255,255,255,0.03);
+          display: inline-block;
+        }
         
         .status-dropdown-container { position: relative; }
         .status-trigger {
@@ -552,10 +603,6 @@ const Scheduler = () => {
                     <tr
                       key={video.id}
                       className="list-row"
-                      style={{
-                        borderLeft: `6px solid ${topicColor}`,
-                        backgroundColor: `${topicColor}15`
-                      }}
                       onClick={(e) => {
                         if (!e.target.closest('.status-dropdown-container')) {
                           setSelectedVideo(video);
@@ -564,13 +611,23 @@ const Scheduler = () => {
                       }}
                     >
                       <td className="list-cell">
-                        <span style={{ fontWeight: '900', color: '#fff', letterSpacing: '0.02em', fontSize: '15px' }}>{video.video_title}</span>
+                        <div className="row-accent" style={{ backgroundColor: topicColor }}></div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', paddingLeft: '8px' }}>
+                          <span style={{ fontWeight: '700', color: '#fff', letterSpacing: '0.01em', fontSize: '15px' }}>{video.video_title}</span>
+                          <span style={{ fontSize: '11px', color: '#555', fontWeight: '500' }}>#{video.id.slice(0, 8)}</span>
+                        </div>
                       </td>
-                      <td className="list-cell" style={{ color: formatDateList(video.created_at).includes('Today') ? '#3b82f6' : '#bbb', fontWeight: '800' }}>
-                        {formatDateList(video.created_at)}
+                      <td className="list-cell">
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{ color: formatDateList(video.created_at).includes('Today') ? '#3b82f6' : '#888', fontWeight: '700', fontSize: '13px' }}>
+                            {formatDateList(video.created_at)}
+                          </span>
+                        </div>
                       </td>
-                      <td className="list-cell" style={{ color: topicColor, fontWeight: '900', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                        {video.topic_name}
+                      <td className="list-cell">
+                        <div className="category-badge" style={{ color: topicColor, border: `1px solid ${topicColor}33` }}>
+                          {video.topic_name}
+                        </div>
                       </td>
                       <td className="list-cell">
                         <div className="status-dropdown-container">

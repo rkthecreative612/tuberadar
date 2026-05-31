@@ -14,24 +14,20 @@ function chunk(arr, size) {
 
 const scrollbarStyles = `
   ::-webkit-scrollbar {
-    width: 8px;
+    display: none;
   }
-  ::-webkit-scrollbar-track {
-    background: transparent;
-  }
-  ::-webkit-scrollbar-thumb {
-    background: #444;
-    border-radius: 4px;
-  }
-  ::-webkit-scrollbar-thumb:hover {
-    background: #555;
+  .hide-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
   }
   .plannerCard {
     transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
   }
   .plannerCard:hover {
     transform: translateY(-5px);
-    box-shadow: 0 12px 24px rgba(0,0,0,0.6) !important;
+    box-shadow: 0 0 20px var(--topic-color), 0 0 40px rgba(0,0,0,0.8) !important;
+    border-color: var(--topic-color) !important;
+    z-index: 10;
   }
   .plannerCard:active {
     cursor: grabbing;
@@ -75,6 +71,23 @@ const scrollbarStyles = `
   }
   .plannerCard button:active {
     transform: scale(0.96);
+  }
+  @keyframes modalColorShift {
+    0% { border-color: #00ffff; box-shadow: 0 0 30px rgba(0, 255, 255, 0.6), 0 0 60px rgba(0, 255, 255, 0.2), 0 0 100px rgba(0,0,0,0.9); }
+    33% { border-color: #22c55e; box-shadow: 0 0 30px rgba(34, 197, 94, 0.6), 0 0 60px rgba(34, 197, 94, 0.2), 0 0 100px rgba(0,0,0,0.9); }
+    66% { border-color: #a855f7; box-shadow: 0 0 30px rgba(168, 85, 247, 0.6), 0 0 60px rgba(168, 85, 247, 0.2), 0 0 100px rgba(0,0,0,0.9); }
+    100% { border-color: #00ffff; box-shadow: 0 0 30px rgba(0, 255, 255, 0.6), 0 0 60px rgba(0, 255, 255, 0.2), 0 0 100px rgba(0,0,0,0.9); }
+  }
+  .color-shift-modal {
+    animation: modalColorShift 6s infinite linear;
+    border: 2px solid #333 !important;
+  }
+  input[type="date"]::-webkit-calendar-picker-indicator {
+    filter: invert(1);
+    cursor: pointer;
+  }
+  :root {
+    color-scheme: dark;
   }
 `;
 
@@ -141,7 +154,104 @@ function Planner() {
   const [deleteModal, setDeleteModal] = useState({ open: false, topicId: null, cardId: null })
   const [schedulingCardId, setSchedulingCardId] = useState(null)
   const [toast, setToast] = useState(null) // { text, kind }
+  const [activeMenuId, setActiveMenuId] = useState(null)
+  const menuRef = useRef(null)
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (menuRef.current && !menuRef.current.contains(e.target)) {
+        setActiveMenuId(null);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const moveTopic = async (topicId, direction) => {
+    const idx = topics.findIndex(t => t.id === topicId);
+    if (idx === -1) return;
+
+    let targetIdx = -1;
+    if (direction === 'left' && idx > 0) targetIdx = idx - 1;
+    if (direction === 'right' && idx < topics.length - 1) targetIdx = idx + 1;
+
+    if (targetIdx === -1) {
+      setActiveMenuId(null);
+      return;
+    }
+
+    const topicA = topics[idx];
+    const topicB = topics[targetIdx];
+
+    // Swap created_at to change order (sorted by created_at DESC)
+    const timeA = topicA.created_at;
+    const timeB = topicB.created_at;
+
+    const { error: errA } = await supabase.from('my_channels').update({ created_at: timeB }).eq('id', topicA.id);
+    const { error: errB } = await supabase.from('my_channels').update({ created_at: timeA }).eq('id', topicB.id);
+
+    if (errA || errB) {
+      setToast({ kind: 'error', text: 'Failed to move topic' });
+      setTimeout(() => setToast(null), 3000);
+    } else {
+      const newTopics = [...topics];
+      newTopics[idx] = { ...topicA, created_at: timeB };
+      newTopics[targetIdx] = { ...topicB, created_at: timeA };
+      newTopics.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+      setTopics(newTopics);
+    }
+    setActiveMenuId(null);
+  };
+
   const dateInputRef = useRef(null)
+  const scrollContainerRef = useRef(null)
+  const [isMouseDown, setIsMouseDown] = useState(false)
+  const [startX, setStartX] = useState(0)
+  const [scrollLeftState, setScrollLeftState] = useState(0)
+  const [hasMoved, setHasMoved] = useState(false)
+
+  const handleMouseDown = (e) => {
+    // Only right click (button 2)
+    if (e.button !== 2) return;
+    
+    // Only scroll if we click the container background, not buttons or cards
+    if (e.target.closest('button') || e.target.closest('.plannerCard')) return;
+    
+    setIsMouseDown(true)
+    setHasMoved(false)
+    setStartX(e.pageX - (scrollContainerRef.current?.offsetLeft || 0))
+    setScrollLeftState(scrollContainerRef.current?.scrollLeft || 0)
+  }
+
+  const handleMouseMove = (e) => {
+    if (!isMouseDown || !scrollContainerRef.current) return
+    const x = e.pageX - scrollContainerRef.current.offsetLeft
+    const dist = x - startX
+    if (Math.abs(dist) > 5) setHasMoved(true)
+    
+    const walk = dist * 2 
+    scrollContainerRef.current.scrollLeft = scrollLeftState - walk
+  }
+
+  const handleMouseUpOrLeave = () => {
+    setIsMouseDown(false)
+  }
+
+  const handleWheel = (e) => {
+    if (scrollContainerRef.current) {
+      // If it's a horizontal swipe (deltaX), scroll the grid horizontally
+      if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
+        scrollContainerRef.current.scrollLeft += e.deltaX;
+      }
+      // Otherwise, let the browser handle vertical scroll naturally
+    }
+  }
+
+  const handleContextMenu = (e) => {
+    if (hasMoved) {
+      e.preventDefault()
+    }
+  }
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }))
 
@@ -222,7 +332,8 @@ function Planner() {
     const { data, error } = await supabase.from('planner_videos').insert(payload).select('*').single()
     if (error) {
       console.log(error)
-      alert('Failed to add video: ' + error.message)
+      setToast({ kind: 'error', text: '❌ Failed to add video: ' + error.message })
+      setTimeout(() => setToast(null), 3000)
       return
     }
 
@@ -232,7 +343,8 @@ function Planner() {
     }))
 
     closeAddModal()
-    alert('✅ Video added to Planner')
+    setToast({ kind: 'success', text: '✅ Video added to Planner' })
+    setTimeout(() => setToast(null), 3000)
   }
 
   async function saveScheduledVideo(date) {
@@ -274,13 +386,15 @@ function Planner() {
     const { error } = await supabase.from('planner_videos').insert(payload)
     if (error) {
       console.log(error)
-      alert('Failed to schedule video: ' + error.message)
+      setToast({ kind: 'error', text: '❌ Failed to schedule video: ' + error.message })
+      setTimeout(() => setToast(null), 3000)
       return
     }
 
     closeAddModal()
     navigate('/scheduler')
-    alert('✅ Video scheduled for ' + date)
+    setToast({ kind: 'success', text: '✅ Video scheduled for ' + date })
+    setTimeout(() => setToast(null), 3000)
   }
 
   useEffect(() => {
@@ -334,31 +448,33 @@ function Planner() {
     }
   }, [])
 
-  const topicRows = useMemo(() => chunk(topics, 4), [topics])
+
 
   const pageStyle = {
-    height: '100%',
+    height: '100vh',
     overflowY: 'auto',
     background: 'radial-gradient(circle at 20% 20%, #161616 0%, #050505 100%)',
     padding: '30px',
     boxSizing: 'border-box',
     color: COLORS.textPrimary,
     fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
+    display: 'flex',
+    flexDirection: 'column',
   }
 
   const gridStyle = {
     display: 'flex',
-    flexDirection: 'column',
-    gap: '24px',
-    maxWidth: '1600px',
-    margin: '0 auto',
+    flexDirection: 'row',
+    gap: '20px',
+    paddingBottom: '40px',
+    overflowX: 'auto',
+    width: '100%',
+    alignItems: 'flex-start',
+    boxSizing: 'border-box',
+    flexShrink: 0,
   }
 
-  const rowStyle = {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
-    gap: '16px',
-  }
+
 
   const colStyle = (color) => ({
     backgroundColor: '#0f0f0f',
@@ -366,6 +482,8 @@ function Planner() {
     borderRadius: '16px',
     overflow: 'hidden',
     minHeight: '180px',
+    width: '340px',
+    flexShrink: 0,
     display: 'flex',
     flexDirection: 'column',
     boxShadow: '0 12px 40px rgba(0,0,0,0.5)',
@@ -408,6 +526,42 @@ function Planner() {
     alignItems: 'center',
     justifyContent: 'center',
     transition: 'all 0.2s',
+  }
+
+  const colMenuButtonStyle = {
+    ...colAddStyle,
+    backgroundColor: 'transparent',
+    fontSize: '18px',
+    paddingBottom: '4px'
+  }
+
+  const dropdownMenuStyle = {
+    position: 'absolute',
+    top: '100%',
+    right: 0,
+    marginTop: '8px',
+    backgroundColor: '#1a1a1a',
+    border: '1px solid #333',
+    borderRadius: '8px',
+    boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
+    zIndex: 100,
+    minWidth: '140px',
+    overflow: 'hidden',
+    display: 'flex',
+    flexDirection: 'column'
+  }
+
+  const menuItemStyle = {
+    padding: '12px 16px',
+    fontSize: '12px',
+    color: '#fff',
+    cursor: 'pointer',
+    textAlign: 'left',
+    transition: 'background 0.2s',
+    border: 'none',
+    backgroundColor: 'transparent',
+    width: '100%',
+    fontFamily: 'inherit'
   }
 
   const colBodyStyle = {
@@ -640,102 +794,144 @@ function Planner() {
   return (
     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
       <style>{scrollbarStyles}</style>
-      <div className="plannerPage" style={pageStyle}>
-        <div style={{ padding: '0 22px 30px 22px', fontSize: '32px', fontWeight: 950, letterSpacing: '-0.03em', background: 'linear-gradient(to right, #fff, #888)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Content Planner</div>
-        <div className="plannerGrid" style={gridStyle}>
-          {topicRows.map((row) => (
-            <div key={row.map((t) => t.id).join('-')} className="plannerRow" style={rowStyle}>
-              {row.map((t, index) => {
-                const rows = byTopic[t.id] || []
-                const ids = rows.map((r) => r.id)
+      <div 
+        className="plannerPage" 
+        style={{ ...pageStyle, cursor: isMouseDown ? 'grabbing' : 'default' }}
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUpOrLeave}
+        onMouseLeave={handleMouseUpOrLeave}
+        onContextMenu={handleContextMenu}
+        onWheel={handleWheel}
+      >
+        <div style={{ padding: '0 22px 30px 22px', fontSize: '42px', fontWeight: 900, textTransform: 'uppercase', textAlign: 'center', letterSpacing: '0.15em', background: 'linear-gradient(to bottom, #ffffff 30%, #555555 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', filter: 'drop-shadow(0px 8px 16px rgba(255,255,255,0.1))', fontFamily: '"Inter", system-ui, sans-serif' }}>Board</div>
+        <div 
+          ref={scrollContainerRef}
+          className="plannerGrid hide-scrollbar" 
+          style={gridStyle}
+        >
+          {topics.map((t, index) => {
+            const rows = byTopic[t.id] || []
+            const ids = rows.map((r) => r.id)
 
-                return (
-                  <section key={t.id} className="plannerColumn" style={colStyle(t.color || COLOR_PALETTE[index % COLOR_PALETTE.length])}>
-                    <div style={colHeaderStyle(t.color || COLOR_PALETTE[index % COLOR_PALETTE.length])}>
-                      <h2 style={colTitleStyle}>{t.name || 'Untitled Topic'}</h2>
-                      <button
-                        type="button"
-                        className="addBtn"
-                        style={colAddStyle}
-                        title="Add"
-                        onClick={() => openAddModal(t)}
-                      >
-                        +
-                      </button>
-                    </div>
+            return (
+              <section key={t.id} className="plannerColumn" style={colStyle(t.color || COLOR_PALETTE[index % COLOR_PALETTE.length])}>
+                <div style={colHeaderStyle(t.color || COLOR_PALETTE[index % COLOR_PALETTE.length])}>
+                  <h2 style={colTitleStyle}>{t.name || 'Untitled Topic'}</h2>
+                  <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '4px', position: 'relative' }}>
+                    <button
+                      type="button"
+                      className="addBtn"
+                      style={colAddStyle}
+                      title="Add"
+                      onClick={() => openAddModal(t)}
+                    >
+                      +
+                    </button>
+                    <button
+                      type="button"
+                      className="addBtn"
+                      style={colMenuButtonStyle}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setActiveMenuId(activeMenuId === t.id ? null : t.id);
+                      }}
+                    >
+                      ⋮
+                    </button>
+                    
+                    {activeMenuId === t.id && (
+                      <div ref={menuRef} style={dropdownMenuStyle}>
+                        <button 
+                          style={{...menuItemStyle, opacity: index === 0 ? 0.3 : 1}} 
+                          onClick={() => index > 0 && moveTopic(t.id, 'left')}
+                          disabled={index === 0}
+                        >
+                          ← Move Left
+                        </button>
+                        <button 
+                          style={{...menuItemStyle, opacity: index === topics.length - 1 ? 0.3 : 1}} 
+                          onClick={() => index < topics.length - 1 && moveTopic(t.id, 'right')}
+                          disabled={index === topics.length - 1}
+                        >
+                          Move Right →
+                        </button>
+                        <style>{`
+                          button:hover { background-color: rgba(255,255,255,0.05) !important; }
+                        `}</style>
+                      </div>
+                    )}
+                  </div>
+                </div>
 
-                    <div style={colBodyStyle}>
-                      {rows.length === 0 ? <div style={emptyStyle}>No planned videos yet.</div> : null}
-                      <SortableContext items={ids} strategy={verticalListSortingStrategy}>
-                        {rows.map((v) => {
-                          const isExpanded = expandedCardId === v.id
-                          const isSaving = !!savingById[v.id]
-                          const saveError = saveErrorById[v.id]
-                          const binded = Array.isArray(v.binded_videos) ? v.binded_videos : []
-                          let videoId = null
-                          try {
-                            if (v.video_link) {
-                              const u = new URL(v.video_link)
-                              videoId = u.searchParams.get('v')
-                            }
-                          } catch { }
-                          const thumbUrl = videoId ? `https://img.youtube.com/vi/${videoId}/mqdefault.jpg` : ''
+                <div style={colBodyStyle}>
+                  {rows.length === 0 ? <div style={emptyStyle}>No planned videos yet.</div> : null}
+                  <SortableContext items={ids} strategy={verticalListSortingStrategy}>
+                    {rows.map((v) => {
+                      const isExpanded = expandedCardId === v.id
+                      const isSaving = !!savingById[v.id]
+                      const saveError = saveErrorById[v.id]
+                      const binded = Array.isArray(v.binded_videos) ? v.binded_videos : []
+                      let videoId = null
+                      try {
+                        if (v.video_link) {
+                          const u = new URL(v.video_link)
+                          videoId = u.searchParams.get('v')
+                        }
+                      } catch { }
+                      const thumbUrl = videoId ? `https://img.youtube.com/vi/${videoId}/mqdefault.jpg` : ''
 
-                          return (
-                            <SortableCard key={v.id} topicId={t.id} v={v}>
-                              {({ attributes, listeners, setActivatorNodeRef, isDragging }) => (
-                                <div className="plannerCard" style={cardStyle(t.color || COLOR_PALETTE[index % COLOR_PALETTE.length], isDragging)} {...attributes}>
-                                  {thumbUrl ? <img src={thumbUrl} alt="" style={thumbStyle} /> : null}
+                      return (
+                        <SortableCard key={v.id} topicId={t.id} v={v}>
+                          {({ attributes, listeners, setActivatorNodeRef, isDragging }) => (
+                            <div className="plannerCard" style={cardStyle(t.color || COLOR_PALETTE[index % COLOR_PALETTE.length], isDragging)} {...attributes}>
+                              {thumbUrl ? <img src={thumbUrl} alt="" style={thumbStyle} /> : null}
 
-                                  <div style={cardBodyStyle}>
-                                    <div ref={setActivatorNodeRef} {...listeners} style={{ width: '100%', cursor: 'grab' }}>
-                                      <h3 style={h3Style}>{v.video_title || 'Untitled'}</h3>
-                                    </div>
-
-                                      <div style={actionsStyle}>
-                                        <button
-                                          type="button"
-                                          style={btnStyle}
-                                          onClick={() => setViewModal({ open: true, topicId: t.id, video: v })}
-                                        >
-                                          View
-                                        </button>
-                                        <button 
-                                          type="button" 
-                                          style={btnPrimaryStyle} 
-                                          onClick={() => setSchedulingCardId(schedulingCardId === v.id ? null : v.id)}
-                                        >
-                                          {schedulingCardId === v.id ? 'Cancel' : 'Schedule'}
-                                        </button>
-                                        <button type="button" style={btnDangerStyle} onClick={() => deleteCard(t.id, v.id)}>
-                                          Delete
-                                        </button>
-                                      </div>
-
-                                    </div>
+                              <div style={cardBodyStyle}>
+                                <div ref={setActivatorNodeRef} {...listeners} style={{ width: '100%', cursor: 'grab' }}>
+                                  <h3 style={h3Style}>{v.video_title || 'Untitled'}</h3>
                                 </div>
-                              )}
-                            </SortableCard>
-                          )
-                        })}
-                      </SortableContext>
-                    </div>
-                  </section>
-                )
-              })}
 
-              {row.length < 4
-                ? Array.from({ length: 4 - row.length }).map((_, i) => (
-                  <div key={`spacer-${i}`} style={{ border: '1px dashed #333', borderRadius: '8px' }} />
-                ))
-                : null}
-            </div>
-          ))}
+                                <div style={actionsStyle}>
+                                  <button
+                                    type="button"
+                                    style={btnStyle}
+                                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); setViewModal({ open: true, topicId: t.id, video: v }); }}
+                                  >
+                                    View
+                                  </button>
+                                  <button 
+                                    type="button" 
+                                    style={btnPrimaryStyle} 
+                                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); setSchedulingCardId(schedulingCardId === v.id ? null : v.id); }}
+                                  >
+                                    {schedulingCardId === v.id ? 'Cancel' : 'Schedule'}
+                                  </button>
+                                  <button 
+                                    type="button" 
+                                    style={btnDangerStyle} 
+                                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); deleteCard(t.id, v.id); }}
+                                  >
+                                    Delete
+                                  </button>
+                                </div>
+
+                              </div>
+                            </div>
+                          )}
+                        </SortableCard>
+                      )
+                    })}
+                  </SortableContext>
+                </div>
+              </section>
+            )
+          })}
         </div>
       </div>
       {addModal.open ? (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '18px', zIndex: 50 }}>
-          <div style={{ width: 'min(800px, 100%)', backgroundColor: COLORS.bgModal, border: `1px solid ${COLORS.borderDefault}`, borderRadius: '16px', overflow: 'hidden', boxShadow: '0 24px 80px rgba(0,0,0,0.55)' }}>
+          <div className="color-shift-modal" style={{ width: 'min(800px, 100%)', backgroundColor: COLORS.bgModal, borderRadius: '16px', overflow: 'hidden' }}>
             <div style={{ padding: '16px', borderBottom: `1px solid ${COLORS.borderDefault}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <h3 style={{ margin: 0, color: COLORS.textPrimary }}>ADD NEW VIDEO TO {addModal.topic?.name || 'TOPIC'}</h3>
               <button onClick={closeAddModal} style={{ background: 'none', border: 'none', color: COLORS.textSecondary, fontSize: '20px', cursor: 'pointer' }}>×</button>
@@ -836,7 +1032,7 @@ function Planner() {
             </div>
           </div>
         </div>
-      ) : null}l}
+      ) : null}
 
       {deleteModal.open ? (
         <div
@@ -916,7 +1112,7 @@ function Planner() {
 
       {viewModal.open && viewModal.video ? (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '18px', zIndex: 50 }}>
-          <div style={{ width: 'min(800px, 100%)', backgroundColor: COLORS.bgModal, border: `1px solid ${COLORS.borderDefault}`, borderRadius: '16px', overflow: 'hidden', boxShadow: '0 24px 80px rgba(0,0,0,0.55)' }}>
+          <div className="color-shift-modal" style={{ width: 'min(800px, 100%)', backgroundColor: COLORS.bgModal, borderRadius: '16px', overflow: 'hidden' }}>
             <div style={{ padding: '16px', borderBottom: `1px solid ${COLORS.borderDefault}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <h3 style={{ margin: 0, color: COLORS.textPrimary, wordBreak: 'break-word' }}>{viewModal.video.video_title || 'Untitled'}</h3>
               <button onClick={() => setViewModal({ open: false, topicId: null, video: null })} style={{ background: 'none', border: 'none', color: COLORS.textSecondary, fontSize: '20px', cursor: 'pointer' }}>×</button>
@@ -1015,7 +1211,6 @@ function Planner() {
             padding: '18px',
           }}
           onClick={(e) => {
-            // Close if clicking the overlay background, not the modal content
             if (e.target === e.currentTarget) {
               setSchedulingCardId(null);
             }
@@ -1024,28 +1219,26 @@ function Planner() {
           <div 
             style={{
               backgroundColor: COLORS.bgModal,
-              border: `1px solid ${COLORS.borderDefault}`,
-              borderRadius: '12px',
-              padding: '10px',
-              maxWidth: '340px',
+              borderRadius: '16px',
+              padding: '0',
+              maxWidth: '380px',
               width: '100%',
-              maxHeight: '90vh',
-              overflowY: 'auto',
-              boxShadow: '0 20px 60px rgba(0,0,0,0.6)',
+              zIndex: 1001,
               display: 'flex',
               flexDirection: 'column',
               gap: '12px',
             }}
             onClick={(e) => {
-              // Prevent closing when clicking inside the modal
               e.stopPropagation();
             }}
           >
             <InlineScheduler 
               video={Object.values(byTopic).flat().find(v => v.id === schedulingCardId)}
               onCancel={() => setSchedulingCardId(null)}
-              onSave={(videoId) => {
+              onSave={(videoId, dateStr) => {
                 setSchedulingCardId(null);
+                setToast({ kind: 'success', text: `✅ Video scheduled for ${dateStr}` });
+                setTimeout(() => setToast(null), 3000);
                 setByTopic(prev => {
                   const next = { ...prev };
                   Object.keys(next).forEach(tid => {

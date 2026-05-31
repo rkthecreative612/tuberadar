@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { searchByChannel, searchByKeywords } from '../lib/youtube'
+import { searchByChannel, searchByKeywords, YouTubeQuotaError } from '../lib/youtube'
 import supabase from '../lib/supabase'
 
 function MainDashboard({ selectedMyChannel, onBackClick }) {
@@ -73,55 +73,60 @@ function MainDashboard({ selectedMyChannel, onBackClick }) {
             publishedAt: item.snippet.publishedAt,
             viewCount: viewCount,
             likeCount: item.likeCount ?? 0,
-            commentCount: item.statistics?.commentCount || 0,
-            description: item.snippet?.description || '',
+            commentCount: item.commentCount ?? (item.statistics?.commentCount || 0),
+            description: item.description || item.snippet?.description || '',
             phase
           }
         }
 
-        // Phase 1: Last 48 hrs
-        const promisesPhase1 = competitors.map(async (comp) => {
-          let items = []
-          if (comp.channel_url) {
-             items = await searchByChannel(comp.channel_url, 'videos', 2, 12)
-          } else if (comp.keywords) {
-             items = await searchByKeywords(comp.keywords, 'videos', 2, 12)
-          }
-          if (!items) return []
-          return items.map(item => mapItem(item, comp, 1))
-        })
+        const fourDaysAgo = Date.now() - 4 * 24 * 60 * 60 * 1000
 
-        const p1Results = await Promise.all(promisesPhase1)
-        let phase1Videos = p1Results.flat().filter(v => !removedIds.includes(v.videoId))
-        phase1Videos.sort((a, b) => b.viewCount - a.viewCount)
-
-        // Phase 2: Top performing last 30 days
-        let phase2Videos = []
-        if (phase1Videos.length < 12) {
-          const needed = 12 - phase1Videos.length;
-          const slotsPerChannel = Math.ceil(needed / competitors.length);
-
-          const promisesPhase2 = competitors.map(async (comp) => {
+        // One YouTube fetch per competitor (30 days) — split into phases client-side to save quota.
+        const competitorResults = await Promise.all(
+          competitors.map(async (comp) => {
             let items = []
             if (comp.channel_url) {
-               items = await searchByChannel(comp.channel_url, 'videos', 30, 15)
+              items = await searchByChannel(comp.channel_url, 'videos', 30, 50)
             } else if (comp.keywords) {
-               items = await searchByKeywords(comp.keywords, 'videos', 30, 15)
+              items = await searchByKeywords(comp.keywords, 'videos', 30, 50)
             }
-            if (!items) return []
-            let mapped = items.map(item => mapItem(item, comp, 2))
-            
-            // Filter out removed and duplicates from Phase 1
-            mapped = mapped.filter(v => 
-              !removedIds.includes(v.videoId) && 
-              !phase1Videos.some(p1 => p1.videoId === v.videoId)
-            )
-            mapped.sort((a, b) => b.viewCount - a.viewCount)
-            return mapped.slice(0, slotsPerChannel)
-          })
+            return { comp, items: items ?? [] }
+          }),
+        )
 
-          const p2Results = await Promise.all(promisesPhase2)
-          phase2Videos = p2Results.flat().sort((a, b) => b.viewCount - a.viewCount).slice(0, needed)
+        let phase1Videos = []
+        let phase2Candidates = []
+
+        for (const { comp, items } of competitorResults) {
+          const recent = items
+            .filter((item) => new Date(item.snippet.publishedAt).getTime() >= fourDaysAgo)
+            .map((item) => mapItem(item, comp, 1))
+            .sort((a, b) => b.viewCount - a.viewCount)
+            .slice(0, 15)
+
+          const older = items
+            .filter((item) => new Date(item.snippet.publishedAt).getTime() < fourDaysAgo)
+            .map((item) => mapItem(item, comp, 2))
+            .sort((a, b) => b.viewCount - a.viewCount)
+            .slice(0, 15)
+
+          phase1Videos.push(...recent)
+          phase2Candidates.push(...older)
+        }
+
+        phase1Videos = phase1Videos.filter(v => !removedIds.includes(v.videoId))
+        phase1Videos.sort((a, b) => b.viewCount - a.viewCount)
+
+        let phase2Videos = []
+        if (phase1Videos.length < 20) {
+          const needed = 20 - phase1Videos.length
+          phase2Videos = phase2Candidates
+            .filter(v =>
+              !removedIds.includes(v.videoId) &&
+              !phase1Videos.some(p1 => p1.videoId === v.videoId),
+            )
+            .sort((a, b) => b.viewCount - a.viewCount)
+            .slice(0, needed)
         }
 
         let allVideos = [...phase1Videos, ...phase2Videos]
@@ -134,7 +139,7 @@ function MainDashboard({ selectedMyChannel, onBackClick }) {
           return true;
         });
 
-        allVideos = allVideos.slice(0, 12);
+        allVideos = allVideos.slice(0, 20);
 
         if (!isMounted) return
 
@@ -142,24 +147,18 @@ function MainDashboard({ selectedMyChannel, onBackClick }) {
 
         // Best-effort cache/persist competitor video metadata (non-blocking for UI).
         try {
-          const camelRows = allVideos.map((v) => ({
-            videoId: v.videoId,
+          const rows = allVideos.map((v) => ({
+            video_id: v.videoId,
             commentCount: v.commentCount,
             description: v.description,
           }))
 
-          const { error: upsertErr } = await supabase
+          const { error: upsertError } = await supabase
             .from('competitor_videos')
-            .upsert(camelRows, { onConflict: 'videoId' })
+            .upsert(rows, { onConflict: 'video_id' })
 
-          if (upsertErr) {
-            const snakeRows = allVideos.map((v) => ({
-              video_id: v.videoId,
-              commentCount: v.commentCount,
-              description: v.description,
-            }))
-
-            await supabase.from('competitor_videos').upsert(snakeRows, { onConflict: 'video_id' })
+          if (upsertError) {
+            console.warn('competitor_videos upsert failed:', upsertError.message)
           }
         } catch (e) {
           // Ignore persistence errors; fetching live data should still work.
@@ -625,14 +624,14 @@ function MainDashboard({ selectedMyChannel, onBackClick }) {
         <div style={statCardsContainerStyle}>
           <div style={statCardStyle}>
             <p style={statValStyle}>{stats.recentCount}</p>
-            <p style={statLabelStyle}>Recent Uploads (48h)</p>
+            <p style={statLabelStyle}>Recent Uploads</p>
           </div>
           <div style={statCardStyle}>
             <p style={statValStyle}>{stats.topCount}</p>
             <p style={statLabelStyle}>Top Performing (&gt;100k views)</p>
           </div>
           <div style={statCardStyle}>
-            <p style={statValStyle} style={{ ...statValStyle, fontSize: '20px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{stats.bestChannel}</p>
+            <p style={{ ...statValStyle, fontSize: '20px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{stats.bestChannel}</p>
             <p style={statLabelStyle}>Best Category Channel</p>
           </div>
         </div>
@@ -668,7 +667,7 @@ function MainDashboard({ selectedMyChannel, onBackClick }) {
                   <React.Fragment key={`${v.videoId}-${idx}`}>
                     {isFirstPhase1 && (
                       <div style={sectionLabelContainerStyle}>
-                        <span style={phase1LabelStyle}>🔴 Recent — last 48hrs</span>
+                        <span style={phase1LabelStyle}>🔴 Recent — last few days</span>
                       </div>
                     )}
                     {isFirstPhase2 && (

@@ -8,7 +8,7 @@ const COLORS = {
   bgCard: '#262626',
   bgCardHover: '#2a2a2a',
   borderColumn: '#333',
-  borderCard: '#404040',
+  borderCard: 'rgba(255, 255, 255, 0.1)',
   textPrimary: '#ffffff',
   textSecondary: '#888888',
   textGray: '#ccc',
@@ -57,7 +57,11 @@ const Status = () => {
   // Drag-to-scroll state
   const [isDraggable, setIsDraggable] = useState(false);
   const boardRef = useRef(null);
-  const dragRef = useRef({ isDown: false, startX: 0, scrollLeft: 0 });
+  const scrollContainerRef = useRef(null);
+  const [isMouseDown, setIsMouseDown] = useState(false);
+  const [startX, setStartX] = useState(0);
+  const [scrollLeft, setScrollLeft] = useState(0);
+  const [hasMoved, setHasMoved] = useState(false);
 
   const menuRef = useRef(null);
   const filterRef = useRef(null);
@@ -117,16 +121,9 @@ const Status = () => {
       if (filterRef.current && !filterRef.current.contains(e.target)) setShowFilterDropdown(false);
       if (monthRef.current && !monthRef.current.contains(e.target)) setShowMonthDropdown(false);
     };
-    const handleContextMenu = (e) => {
-      if (dragRef.current.isDown || isDraggable) {
-        e.preventDefault();
-      }
-    };
     document.addEventListener('mousedown', handleClickOutside);
-    document.addEventListener('contextmenu', handleContextMenu);
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
-      document.removeEventListener('contextmenu', handleContextMenu);
     };
   }, []);
 
@@ -173,26 +170,43 @@ const Status = () => {
     };
   }, [activeModal]);
 
-  const handleBoardMouseDown = (e) => {
-    if (e.button === 2) { // Right click
-      e.preventDefault();
-      dragRef.current = { isDown: true, startX: e.pageX - boardRef.current.offsetLeft, scrollLeft: boardRef.current.scrollLeft };
-      setIsDraggable(true);
+  const handleMouseDown = (e) => {
+    if (e.button !== 2) return // Only right-click
+    setIsMouseDown(true)
+    setHasMoved(false)
+    setStartX(e.pageX - (boardRef.current?.offsetLeft || 0))
+    setScrollLeft(boardRef.current?.scrollLeft || 0)
+  }
+
+  const handleMouseMove = (e) => {
+    if (!isMouseDown) return
+    e.preventDefault()
+    const x = e.pageX - (boardRef.current?.offsetLeft || 0)
+    const walk = (x - startX) * 1.5
+    if (boardRef.current) {
+      boardRef.current.scrollLeft = scrollLeft - walk
     }
-  };
+    if (Math.abs(x - startX) > 5) setHasMoved(true)
+  }
 
-  const handleBoardMouseMove = (e) => {
-    if (!dragRef.current.isDown) return;
-    e.preventDefault();
-    const x = e.pageX - boardRef.current.offsetLeft;
-    const walk = (x - dragRef.current.startX) * 1.5;
-    boardRef.current.scrollLeft = dragRef.current.scrollLeft - walk;
-  };
+  const handleMouseUpOrLeave = () => {
+    setIsMouseDown(false)
+  }
 
-  const handleBoardMouseUp = () => {
-    dragRef.current.isDown = false;
-    setIsDraggable(false);
-  };
+  const handleWheel = (e) => {
+    if (boardRef.current) {
+      if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
+        boardRef.current.scrollLeft += e.deltaX;
+      }
+    }
+  }
+
+  const handleContextMenu = (e) => {
+    if (hasMoved) {
+      e.preventDefault()
+      setHasMoved(false)
+    }
+  }
 
   const showToast = (text, type = 'success') => {
     setToast({ text, type });
@@ -202,8 +216,15 @@ const Status = () => {
   // --- ACTIONS ---
 
   const handleDragStart = (e, videoId) => {
-    setDraggedVideoId(videoId);
+    // Set a slight delay before updating state so the browser captures the card as fully opaque for the ghost image
+    const element = e.currentTarget;
+    e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('videoId', videoId);
+    
+    // Create a "clean" drag image if possible, or just delay the state update
+    setTimeout(() => {
+      setDraggedVideoId(videoId);
+    }, 0);
   };
 
   const handleDrop = async (e, newStatus) => {
@@ -244,6 +265,7 @@ const Status = () => {
       const updated = prev.map(v => v.id === video.id ? { ...v, video_status: newStatus, position: newPosition } : v);
       return updated;
     });
+    setDraggedVideoId(null);
 
     try {
       const updatePayload = { video_status: newStatus, position: newPosition };
@@ -474,14 +496,15 @@ const Status = () => {
 
   const rootStyle = {
     padding: '32px',
-    height: '100%',
+    height: '100vh',
+    overflowY: 'auto',
     backgroundColor: COLORS.bgMain,
     display: 'flex',
     flexDirection: 'column',
     boxSizing: 'border-box',
     fontFamily: 'system-ui, -apple-system, sans-serif',
     color: '#fff',
-    overflow: 'hidden',
+    cursor: isMouseDown ? 'grabbing' : 'default',
   };
 
   const headerStyle = { fontSize: '32px', fontWeight: '700', marginBottom: '32px', margin: 0 };
@@ -489,11 +512,10 @@ const Status = () => {
   const boardStyle = {
     display: 'flex',
     gap: '16px',
-    flex: 1,
+    flex: '0 0 auto',
     overflowX: 'auto',
     alignItems: 'flex-start',
-    paddingBottom: '20px',
-    cursor: isDraggable ? 'grabbing' : 'default',
+    paddingBottom: '40px',
     userSelect: 'none',
     scrollbarWidth: 'none', // Firefox
   };
@@ -506,10 +528,10 @@ const Status = () => {
     borderRadius: '12px',
     display: 'flex',
     flexDirection: 'column',
-    maxHeight: 'calc(100vh - 200px)',
     borderStyle: isOver ? 'dashed' : 'solid',
     borderWidth: isOver ? '2px' : '1px',
     transition: 'all 200ms ease',
+    flexShrink: 0,
   });
 
   const columnHeaderStyle = {
@@ -546,18 +568,27 @@ const Status = () => {
     display: 'flex',
     flexDirection: 'column',
     gap: '12px',
-    overflowY: 'auto',
     flex: 1,
   };
 
   const cardStyle = (topicColor) => ({
-    backgroundColor: COLORS.bgCard,
-    border: `1px solid ${COLORS.borderCard}`,
-    borderLeft: `4px solid ${topicColor}`,
-    borderRadius: '8px',
-    padding: '10px',
+    backgroundColor: `${topicColor}15`,
+    backdropFilter: 'blur(12px)',
+    border: `1px solid ${topicColor}30`,
+    borderRadius: '12px',
+    padding: '12px', 
     cursor: draggedVideoId ? 'grabbing' : 'grab',
-    transition: 'all 150ms cubic-bezier(0.4, 0, 0.2, 1)',
+    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+    position: 'relative',
+    overflow: 'hidden',
+    flexShrink: 0,
+    minHeight: '80px',
+    // Cinematic Bloom Effect - Subtle glow that bleeds from the edges
+    boxShadow: `
+      0 4px 20px -2px ${topicColor}20,
+      inset 0 0 0 1px ${topicColor}20
+    `,
+    backgroundImage: `linear-gradient(135deg, ${topicColor}30 0%, rgba(15, 15, 15, 0.8) 100%)`,
   });
 
   const modalOverlayStyle = {
@@ -659,7 +690,16 @@ const Status = () => {
   );
 
   return (
-    <div style={rootStyle}>
+    <div 
+      style={rootStyle} 
+      className={draggedVideoId ? 'is-dragging' : ''}
+      onMouseDown={handleMouseDown}
+      onMouseMove={handleMouseMove}
+      onMouseUp={handleMouseUpOrLeave}
+      onMouseLeave={handleMouseUpOrLeave}
+      onContextMenu={handleContextMenu}
+      onWheel={handleWheel}
+    >
       <style>{`
         .board-container::-webkit-scrollbar { display: none; }
         .cards-container::-webkit-scrollbar { width: 4px; }
@@ -668,6 +708,7 @@ const Status = () => {
         .icon-btn:hover { background: #333; color: #fff; }
         .dropdown-item:hover { background: #333; }
         .topic-select-btn:hover { background-color: #333 !important; }
+        .is-dragging * { cursor: grabbing !important; }
         .tooltip { position: relative; }
         .tooltip:hover::after {
           content: attr(data-tooltip);
@@ -684,12 +725,20 @@ const Status = () => {
           z-index: 1000;
           margin-bottom: 8px;
         }
+        .status-card {
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .status-card:not(.is-dragging-card):hover {
+          background-color: var(--hover-bg) !important;
+          box-shadow: var(--hover-shadow) !important;
+          transform: translateY(-3px) !important;
+        }
       `}</style>
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-        <h1 style={headerStyle}>Status</h1>
+      <div style={{ position: 'relative', display: 'flex', justifyContent: 'center', alignItems: 'center', marginBottom: '32px' }}>
+        <h1 style={{ fontSize: '42px', fontWeight: 900, textTransform: 'uppercase', textAlign: 'center', letterSpacing: '0.15em', background: 'linear-gradient(to bottom, #ffffff 30%, #555555 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', filter: 'drop-shadow(0px 8px 16px rgba(255,255,255,0.1))', margin: 0, fontFamily: '"Inter", system-ui, sans-serif' }}>Status</h1>
         
-        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+        <div style={{ position: 'absolute', right: 0, display: 'flex', gap: '12px', alignItems: 'center' }}>
           {/* Month Picker */}
           <div style={{ position: 'relative' }} ref={monthRef}>
             <button
@@ -848,13 +897,10 @@ const Status = () => {
           Loading Board...
         </div>
       ) : (
-        <div
-          ref={boardRef}
+        <div 
+          ref={boardRef} 
+          className="board-container hide-scrollbar" 
           style={boardStyle}
-          onMouseDown={handleBoardMouseDown}
-          onMouseMove={handleBoardMouseMove}
-          onMouseUp={handleBoardMouseUp}
-          onMouseLeave={handleBoardMouseUp}
         >
           {columns.map(col => {
             const colVideos = videos.filter(v => {
@@ -939,32 +985,22 @@ const Status = () => {
                       return (
                         <div
                           key={v.id}
+                          className={`status-card ${draggedVideoId === v.id ? 'is-dragging-card' : ''}`}
                           draggable
                           onDragStart={e => handleDragStart(e, v.id)}
                           onDragEnd={() => setDraggedVideoId(null)}
                           onClick={() => setSelectedVideo(v)}
                           data-video-id={v.id}
-                          style={{
-                            ...cardStyle(topicColor),
-                            opacity: draggedVideoId === v.id ? 0.5 : 1,
-                            transform: draggedVideoId === v.id ? 'scale(0.95) rotate(2deg)' : 'scale(1) rotate(0deg)',
-                            transition: 'all 150ms cubic-bezier(0.4, 0, 0.2, 1)',
-                            boxShadow: draggedVideoId === v.id 
-                              ? '0 20px 40px rgba(0,0,0,0.8), 0 0 0 2px rgba(255,255,255,0.1)' 
-                              : 'none',
-                          }}
-                          onMouseEnter={e => {
-                            if (draggedVideoId !== v.id) {
-                              e.currentTarget.style.backgroundColor = COLORS.bgCardHover;
-                              e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.4)';
-                            }
-                          }}
-                          onMouseLeave={e => {
-                            if (draggedVideoId !== v.id) {
-                              e.currentTarget.style.backgroundColor = COLORS.bgCard;
-                              e.currentTarget.style.boxShadow = 'none';
-                            }
-                          }}
+                            style={{
+                              ...cardStyle(topicColor),
+                              '--hover-bg': `${topicColor}25`,
+                              '--hover-shadow': `0 8px 30px -4px ${topicColor}50, 0 0 12px ${topicColor}40, inset 0 0 0 1px ${topicColor}50`,
+                              // Reduced opacity on the original card only AFTER the drag has started to keep ghost image solid
+                              opacity: draggedVideoId === v.id ? 0.3 : 1,
+                              transform: draggedVideoId === v.id ? 'scale(0.95)' : 'scale(1)',
+                              // Disable backdrop-filter during drag to help browser capture ghost image
+                              backdropFilter: draggedVideoId === v.id ? 'none' : 'blur(12px)',
+                            }}
                         >
                           <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
                             <div style={{ flex: 1 }}>

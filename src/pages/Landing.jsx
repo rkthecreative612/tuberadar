@@ -74,12 +74,39 @@ const AnimatedNumber = ({ value, suffix = '' }) => {
 const TrendIndicator = ({ current, previous, label = "last month" }) => {
   const diff = current - previous
   if (diff === 0) return (
-    <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '14px', height: '14px', borderRadius: '50%', backgroundColor: '#22c55e', color: '#000', fontSize: '9px', marginLeft: '8px' }}>✓</span>
+    <span style={{ 
+      display: 'inline-flex', alignItems: 'center', justifyContent: 'center', 
+      padding: '4px 8px', borderRadius: '12px', 
+      backgroundColor: 'rgba(107, 114, 128, 0.1)', 
+      color: '#9ca3af', fontSize: '10px', marginLeft: '12px', 
+      border: '1px solid rgba(107, 114, 128, 0.2)',
+      fontWeight: '700', letterSpacing: '0.05em',
+      transform: 'translateY(-3px)'
+    }}>
+      <span style={{ marginRight: '4px', fontSize: '11px' }}>—</span> SAME AS {label.toUpperCase()}
+    </span>
   )
+  
   const isUp = diff > 0
+  const color = isUp ? '#22c55e' : '#ef4444'
+  const bgColor = isUp ? 'rgba(34, 197, 94, 0.1)' : 'rgba(239, 68, 68, 0.1)'
+  const borderColor = isUp ? 'rgba(34, 197, 94, 0.2)' : 'rgba(239, 68, 68, 0.2)'
+
   return (
-    <span style={{ color: isUp ? '#22c55e' : '#ef4444', fontSize: '11px', marginLeft: '8px', fontWeight: '700', whiteSpace: 'nowrap' }}>
-      {isUp ? '▲' : '▼'} {isUp ? '+' : ''}{diff} than {label}
+    <span style={{ 
+      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+      padding: '4px 8px', borderRadius: '12px',
+      backgroundColor: bgColor, border: `1px solid ${borderColor}`,
+      color: color, fontSize: '10px', marginLeft: '12px', 
+      fontWeight: '700', whiteSpace: 'nowrap', letterSpacing: '0.05em',
+      boxShadow: `0 2px 10px ${bgColor}`,
+      textTransform: 'uppercase',
+      transform: 'translateY(-3px)'
+    }}>
+      <span style={{ fontSize: '12px', marginRight: '4px' }}>
+        {isUp ? '↑' : '↓'}
+      </span>
+      {Math.abs(diff)} {label}
     </span>
   )
 }
@@ -456,9 +483,14 @@ const Landing = () => {
           0% { opacity: 1; }
           100% { opacity: 0; }
         }
+        @keyframes pulseGlow {
+          0%, 100% { opacity: 1; transform: scale(1); box-shadow: 0 0 10px currentColor; }
+          50% { opacity: 0.8; transform: scale(1.4); box-shadow: 0 0 25px currentColor, 0 0 10px currentColor; }
+        }
         .anim-done { animation: fadeOutSlideUp 300ms ease-out forwards; }
         .anim-shake { animation: shake 400ms ease-in-out; }
         .anim-fade { animation: fadeOut 200ms ease-out forwards; }
+        .pulse-dot { animation: pulseGlow 2s infinite ease-in-out; }
         
         .insights-scroll::-webkit-scrollbar { height: 8px; }
         .insights-scroll::-webkit-scrollbar-track { background: #1a1a1a; }
@@ -469,15 +501,36 @@ const Landing = () => {
         button:active { transform: translateY(0); }
 
         .overview-card {
-          transition: all 0.3s ease;
+          transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
           position: relative;
+          background: linear-gradient(145deg, #1e1e1e 0%, #121212 100%);
+          border: 1px solid rgba(255, 255, 255, 0.03);
+          box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+          overflow: hidden;
+        }
+        .overview-card::before {
+          content: "";
+          position: absolute;
+          top: 0; left: 0; right: 0; bottom: 0;
+          border-radius: 16px;
+          padding: 1px;
+          background: linear-gradient(145deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0));
+          -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+          -webkit-mask-composite: xor;
+          mask-composite: exclude;
+          opacity: 0.5;
+          transition: opacity 0.4s ease;
+          pointer-events: none;
         }
         .overview-card:hover {
-          border-color: #22c55e88 !important;
-          box-shadow: 0 0 25px #22c55e15;
-          transform: translateY(-2px);
+          transform: translateY(-4px);
+          box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5), 0 0 40px rgba(34, 197, 94, 0.1);
         }
-        .overview-card:hover h3 { color: #22c55e !important; }
+        .overview-card:hover::before {
+          opacity: 1;
+          background: linear-gradient(145deg, rgba(34, 197, 94, 0.5), rgba(255, 255, 255, 0.05));
+        }
+        .overview-card:hover h3 { color: #fff !important; }
         
         .insight-card {
           transition: all 0.3s ease;
@@ -503,56 +556,71 @@ const Landing = () => {
         <h2 style={{ fontSize: '10px', color: COLORS.grey, fontWeight: 'bold', letterSpacing: '0.05em', marginBottom: '12px' }}>
           {overviewData.monthName} {overviewData.year} OVERVIEW
         </h2>
-        <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
-          <div className="overview-card" style={{ flex: 1, minWidth: '300px', backgroundColor: COLORS.bgCard, border: `1px solid ${COLORS.border}`, padding: '24px', borderRadius: '12px' }}>
-            <h3 style={{ fontSize: '13px', color: COLORS.textSecondary, marginBottom: '24px', fontWeight: 800, letterSpacing: '0.02em', transition: '0.3s' }}>THIS WEEK</h3>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <div>
-                <div style={{ fontSize: '10px', color: COLORS.grey, fontWeight: 700 }}>PLANNED</div>
-                <div style={{ fontSize: '32px', fontWeight: '900', display: 'flex', alignItems: 'baseline', marginTop: '4px' }}>
+        <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap' }}>
+          <div className="overview-card" style={{ flex: 1, minWidth: '320px', padding: '32px', borderRadius: '16px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+            <h3 style={{ fontSize: '12px', color: COLORS.textMuted, margin: 0, fontWeight: 800, letterSpacing: '0.1em', transition: '0.3s', display: 'flex', alignItems: 'center', gap: '8px', zIndex: 1 }}>
+              <span className="pulse-dot" style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: COLORS.blue, display: 'inline-block', color: COLORS.blue }}></span>
+              THIS WEEK
+            </h3>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', zIndex: 1 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <div style={{ fontSize: '11px', color: COLORS.grey, fontWeight: 700, letterSpacing: '0.05em' }}>PLANNED</div>
+                <div style={{ fontSize: '36px', fontWeight: '900', display: 'flex', alignItems: 'baseline' }}>
                   <AnimatedNumber value={overviewData.week.planned} />
                   <TrendIndicator current={overviewData.week.planned} previous={prevMonthStats.planned} />
                 </div>
               </div>
-              <div>
-                <div style={{ fontSize: '10px', color: COLORS.grey, fontWeight: 700 }}>COMPLETED</div>
-                <div style={{ fontSize: '32px', fontWeight: '900', color: COLORS.green, display: 'flex', alignItems: 'baseline', marginTop: '4px' }}>
+              <div style={{ width: '1px', height: '40px', backgroundColor: 'rgba(255,255,255,0.05)' }}></div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <div style={{ fontSize: '11px', color: COLORS.grey, fontWeight: 700, letterSpacing: '0.05em' }}>COMPLETED</div>
+                <div style={{ fontSize: '36px', fontWeight: '900', color: COLORS.green, display: 'flex', alignItems: 'baseline', textShadow: '0 0 20px rgba(34,197,94,0.3)' }}>
                   <AnimatedNumber value={overviewData.week.completed} />
                   <TrendIndicator current={overviewData.week.completed} previous={prevMonthStats.completed} />
                 </div>
               </div>
-              <div>
-                <div style={{ fontSize: '10px', color: COLORS.grey, fontWeight: 700 }}>RATE</div>
-                <div style={{ fontSize: '32px', fontWeight: '900', marginTop: '4px' }}>
+              <div style={{ width: '1px', height: '40px', backgroundColor: 'rgba(255,255,255,0.05)' }}></div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <div style={{ fontSize: '11px', color: COLORS.grey, fontWeight: 700, letterSpacing: '0.05em' }}>RATE</div>
+                <div style={{ fontSize: '36px', fontWeight: '900' }}>
                   <AnimatedNumber value={overviewData.week.rate} suffix="%" />
                 </div>
               </div>
             </div>
+            {/* Ambient Background Glow */}
+            <div style={{ position: 'absolute', top: '-50px', right: '-50px', width: '200px', height: '200px', background: `radial-gradient(circle, ${COLORS.blue}15 0%, transparent 70%)`, borderRadius: '50%', pointerEvents: 'none' }}></div>
           </div>
-          <div className="overview-card" style={{ flex: 1, minWidth: '300px', backgroundColor: COLORS.bgCard, border: `1px solid ${COLORS.border}`, padding: '24px', borderRadius: '12px' }}>
-            <h3 style={{ fontSize: '13px', color: COLORS.textSecondary, marginBottom: '24px', fontWeight: 800, letterSpacing: '0.02em', transition: '0.3s' }}>THIS MONTH</h3>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <div>
-                <div style={{ fontSize: '10px', color: COLORS.grey, fontWeight: 700 }}>PLANNED</div>
-                <div style={{ fontSize: '32px', fontWeight: '900', display: 'flex', alignItems: 'baseline', marginTop: '4px' }}>
+          
+          <div className="overview-card" style={{ flex: 1, minWidth: '320px', padding: '32px', borderRadius: '16px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+            <h3 style={{ fontSize: '12px', color: COLORS.textMuted, margin: 0, fontWeight: 800, letterSpacing: '0.1em', transition: '0.3s', display: 'flex', alignItems: 'center', gap: '8px', zIndex: 1 }}>
+              <span className="pulse-dot" style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: COLORS.orange, display: 'inline-block', color: COLORS.orange }}></span>
+              THIS MONTH
+            </h3>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', zIndex: 1 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <div style={{ fontSize: '11px', color: COLORS.grey, fontWeight: 700, letterSpacing: '0.05em' }}>PLANNED</div>
+                <div style={{ fontSize: '36px', fontWeight: '900', display: 'flex', alignItems: 'baseline' }}>
                   <AnimatedNumber value={overviewData.month.planned} />
                   <TrendIndicator current={overviewData.month.planned} previous={prevMonthStats.planned} />
                 </div>
               </div>
-              <div>
-                <div style={{ fontSize: '10px', color: COLORS.grey, fontWeight: 700 }}>COMPLETED</div>
-                <div style={{ fontSize: '32px', fontWeight: '900', color: COLORS.green, display: 'flex', alignItems: 'baseline', marginTop: '4px' }}>
+              <div style={{ width: '1px', height: '40px', backgroundColor: 'rgba(255,255,255,0.05)' }}></div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <div style={{ fontSize: '11px', color: COLORS.grey, fontWeight: 700, letterSpacing: '0.05em' }}>COMPLETED</div>
+                <div style={{ fontSize: '36px', fontWeight: '900', color: COLORS.green, display: 'flex', alignItems: 'baseline', textShadow: '0 0 20px rgba(34,197,94,0.3)' }}>
                   <AnimatedNumber value={overviewData.month.completed} />
                   <TrendIndicator current={overviewData.month.completed} previous={prevMonthStats.completed} />
                 </div>
               </div>
-              <div>
-                <div style={{ fontSize: '10px', color: COLORS.grey, fontWeight: 700 }}>RATE</div>
-                <div style={{ fontSize: '32px', fontWeight: '900', marginTop: '4px' }}>
+              <div style={{ width: '1px', height: '40px', backgroundColor: 'rgba(255,255,255,0.05)' }}></div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <div style={{ fontSize: '11px', color: COLORS.grey, fontWeight: 700, letterSpacing: '0.05em' }}>RATE</div>
+                <div style={{ fontSize: '36px', fontWeight: '900' }}>
                   <AnimatedNumber value={overviewData.month.rate} suffix="%" />
                 </div>
               </div>
             </div>
+            {/* Ambient Background Glow */}
+            <div style={{ position: 'absolute', top: '-50px', right: '-50px', width: '200px', height: '200px', background: `radial-gradient(circle, ${COLORS.orange}15 0%, transparent 70%)`, borderRadius: '50%', pointerEvents: 'none' }}></div>
           </div>
         </div>
       </section>
@@ -568,21 +636,25 @@ const Landing = () => {
             <div style={{ fontSize: '16px', fontWeight: 'bold' }}>You're all caught up! No pending actions.</div>
           </div>
         ) : (
-          overdueVideos.map(video => (
-            <div key={video.id} className={isDoneAnimating === video.id ? 'anim-done' : ''} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: COLORS.bgCard, borderLeft: `4px solid ${topicColorMap[video.topic_id] || COLORS.red}`, padding: '16px', borderRadius: '4px', marginBottom: '12px', gap: '20px' }}>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 'bold', fontSize: '16px' }}>{video.video_title}</div>
-                <div style={{ color: COLORS.textSecondary, fontSize: '12px', marginTop: '4px' }}>
-                  Category: [{channelMap[video.topic_id] || 'Unknown Topic'}] — Scheduled: {timeAgo(video.created_at)}
+          overdueVideos.map(video => {
+            const tColor = topicColorMap[video.topic_id] || COLORS.red;
+            return (
+              <div key={video.id} className={isDoneAnimating === video.id ? 'anim-done' : ''} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#161616', border: '1px solid rgba(255, 255, 255, 0.05)', padding: '16px 20px', borderRadius: '12px', marginBottom: '12px', gap: '20px', transition: 'all 0.3s ease', cursor: 'default', boxShadow: '0 4px 15px rgba(0, 0, 0, 0.2)' }} onMouseOver={(e) => { e.currentTarget.style.borderColor = `${tColor}55`; e.currentTarget.style.transform = 'translateX(4px)'; }} onMouseOut={(e) => { e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.05)'; e.currentTarget.style.transform = 'translateX(0)'; }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 'bold', fontSize: '15px', color: 'white', letterSpacing: '0.01em' }}>{video.video_title}</div>
+                  <div style={{ color: COLORS.textMuted, fontSize: '12px', marginTop: '4px' }}>
+                    <span style={{ color: tColor, fontWeight: 600 }}>{channelMap[video.topic_id] || 'Unknown Topic'}</span> <span style={{ opacity: 0.5, margin: '0 4px' }}>•</span> Scheduled: {timeAgo(video.created_at)}
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button onClick={() => handleMarkDone(video.id)} style={{ backgroundColor: `${COLORS.green}15`, color: COLORS.green, border: `1px solid ${COLORS.green}33`, padding: '8px 16px', fontSize: '10px', fontWeight: 800, borderRadius: '8px', letterSpacing: '0.05em' }}>DONE</button>
+                  <button onClick={() => handleReschedule(video.id)} style={{ backgroundColor: `${COLORS.blue}15`, color: COLORS.blue, border: `1px solid ${COLORS.blue}33`, padding: '8px 16px', fontSize: '10px', fontWeight: 800, borderRadius: '8px', letterSpacing: '0.05em' }}>RE-SCHEDULED</button>
+                  <button onClick={() => { setCancelingVideoId(video.id); setShowCancelModal(true); }} style={{ backgroundColor: `${COLORS.red}15`, color: COLORS.red, border: `1px solid ${COLORS.red}33`, padding: '8px 16px', fontSize: '10px', fontWeight: 800, borderRadius: '8px', letterSpacing: '0.05em' }}>CANCELED</button>
                 </div>
               </div>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <button onClick={() => handleMarkDone(video.id)} style={{ backgroundColor: COLORS.green, padding: '10px 12px', fontSize: '8px', fontWeight: 800, borderRadius: '4px', color: 'white' }}>DONE</button>
-                <button onClick={() => handleReschedule(video.id)} style={{ backgroundColor: COLORS.blue, padding: '10px 12px', fontSize: '8px', fontWeight: 800, borderRadius: '4px', color: 'white' }}>RE-SCHEDULED</button>
-                <button onClick={() => { setCancelingVideoId(video.id); setShowCancelModal(true); }} style={{ backgroundColor: COLORS.red, padding: '10px 12px', fontSize: '8px', fontWeight: 800, borderRadius: '4px', color: 'white' }}>CANCELED</button>
-              </div>
-            </div>
-          )))}
+            )
+          })
+        )}
       </section>
 
       {/* SECTION 4: UPCOMINGS */}
@@ -594,13 +666,16 @@ const Landing = () => {
           upcomingVideos.map(video => {
             const days = getCountdown(video.scheduled_time)
             const badgeColor = days < 2 ? COLORS.red : days < 7 ? COLORS.orange : COLORS.green
+            const tColor = topicColorMap[video.topic_id] || COLORS.blue
             return (
-              <div key={video.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: COLORS.bgCard, border: `1px solid ${COLORS.border}`, padding: '16px', borderRadius: '8px', marginBottom: '12px' }}>
+              <div key={video.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#161616', border: '1px solid rgba(255, 255, 255, 0.05)', padding: '16px 20px', borderRadius: '12px', marginBottom: '12px', transition: 'all 0.3s ease', cursor: 'default' }} onMouseOver={(e) => { e.currentTarget.style.backgroundColor = '#1c1c1c'; e.currentTarget.style.borderColor = `${tColor}66`; e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = `0 8px 30px ${tColor}25, inset 0 0 20px ${tColor}05` }} onMouseOut={(e) => { e.currentTarget.style.backgroundColor = '#161616'; e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.05)'; e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none' }}>
                 <div style={{ display: 'flex', flexDirection: 'column' }}>
-                  <div style={{ fontWeight: 'bold', fontSize: '14px' }}>{video.video_title}</div>
-                  <div style={{ color: COLORS.textSecondary, fontSize: '12px', marginTop: '2px' }}>Topic: {channelMap[video.topic_id] || 'Unknown Topic'}</div>
+                  <div style={{ fontWeight: 'bold', fontSize: '14px', color: 'white' }}>{video.video_title}</div>
+                  <div style={{ color: COLORS.textMuted, fontSize: '12px', marginTop: '4px', display: 'flex', alignItems: 'center' }}>
+                     Topic: <span style={{ color: 'white', fontWeight: 500, marginLeft: '4px' }}>{channelMap[video.topic_id] || 'Unknown Topic'}</span>
+                  </div>
                 </div>
-                <div style={{ color: badgeColor, fontSize: '12px', fontWeight: 600 }}>
+                <div style={{ backgroundColor: `${badgeColor}15`, border: `1px solid ${badgeColor}33`, color: badgeColor, padding: '4px 12px', borderRadius: '12px', fontSize: '11px', fontWeight: 700, letterSpacing: '0.02em', boxShadow: `0 0 10px ${badgeColor}11` }}>
                   In {getCountdown(video.created_at)} days
                 </div>
               </div>
@@ -639,32 +714,38 @@ const Landing = () => {
           </div>
         </div>
 
-        <div className="insights-scroll" style={{ display: 'flex', gap: '16px', overflowX: 'auto', paddingBottom: '16px' }}>
+        <div className="insights-scroll" style={{ display: 'flex', gap: '16px', overflowX: 'auto', padding: '12px 4px 20px 4px', margin: '-12px -4px -20px -4px' }}>
           {insightsData.stats.map(topic => {
             const diff = topic.currentTotal - topic.prevTotal;
+            const tColor = topicColorMap[topic.id] || '#333';
             return (
-              <div key={topic.id} className="insight-card" style={{ flex: '0 0 200px', backgroundColor: COLORS.bgCard, padding: '20px', borderRadius: '12px', borderLeft: `4px solid ${topicColorMap[topic.id] || '#333'}` }}>
-                <div style={{ fontWeight: '900', fontSize: '16px', marginBottom: '16px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{topic.name}</div>
+              <div key={topic.id} style={{ flex: '0 0 200px', backgroundColor: `${tColor}0A`, padding: '24px 20px', borderRadius: '16px', border: `1px solid ${tColor}25`, transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)', cursor: 'default' }} onMouseOver={(e) => { e.currentTarget.style.backgroundColor = `${tColor}15`; e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.boxShadow = `0 12px 24px ${tColor}20`; e.currentTarget.style.borderColor = `${tColor}50`; }} onMouseOut={(e) => { e.currentTarget.style.backgroundColor = `${tColor}0A`; e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; e.currentTarget.style.borderColor = `${tColor}25`; }}>
+                <div style={{ fontWeight: '900', fontSize: '16px', marginBottom: '16px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: 'white', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: tColor, display: 'inline-block', boxShadow: `0 0 10px ${tColor}` }}></span>
+                  {topic.name}
+                </div>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '20px' }}>
-                  <div style={{ fontSize: '13px', color: COLORS.textSecondary }}>
-                    No. of uploads : <span style={{ color: 'white', fontWeight: '700' }}>{topic.uploads}</span>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '24px' }}>
+                  <div style={{ fontSize: '12px', color: COLORS.textMuted, display: 'flex', justifyContent: 'space-between' }}>
+                    <span>Uploads</span>
+                    <span style={{ color: 'white', fontWeight: '800', fontSize: '14px' }}>{topic.uploads}</span>
                   </div>
-                  <div style={{ fontSize: '13px', color: COLORS.textSecondary }}>
-                    Planned : <span style={{ color: 'white', fontWeight: '700' }}>{topic.planned}</span>
+                  <div style={{ fontSize: '12px', color: COLORS.textMuted, display: 'flex', justifyContent: 'space-between' }}>
+                    <span>Planned</span>
+                    <span style={{ color: 'white', fontWeight: '800', fontSize: '14px' }}>{topic.planned}</span>
                   </div>
                 </div>
 
-                <div style={{ borderTop: '1px solid #333', paddingTop: '12px', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '10px', color: COLORS.textMuted }}>
-                  Compared to Previous month:
+                <div style={{ borderTop: `1px solid ${tColor}22`, paddingTop: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  <span style={{ fontSize: '10px', fontWeight: 700, color: COLORS.textMuted, letterSpacing: '0.05em' }}>COMPARED TO LAST MONTH</span>
                   {diff === 0 ? (
-                    <span style={{ color: COLORS.green }}>✓</span>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', padding: '4px 8px', borderRadius: '12px', backgroundColor: 'rgba(107, 114, 128, 0.1)', color: '#9ca3af', border: '1px solid rgba(107, 114, 128, 0.2)', fontWeight: '700', width: 'fit-content', fontSize: '10px', letterSpacing: '0.05em' }}>
+                      <span style={{ marginRight: '4px' }}>—</span> NO CHANGE
+                    </span>
                   ) : (
-                    <span style={{ color: diff > 0 ? COLORS.green : COLORS.red, fontWeight: '700', display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
-                      <span style={{ backgroundColor: diff > 0 ? COLORS.green : COLORS.red, color: 'black', padding: '1px 3px', borderRadius: '2px', fontSize: '8px' }}>
-                        {diff > 0 ? '▲' : '▼'}
-                      </span>
-                      {diff > 0 ? `+${diff}` : diff} {diff > 0 ? 'new' : ''}
+                    <span style={{ display: 'inline-flex', alignItems: 'center', padding: '4px 8px', borderRadius: '12px', backgroundColor: diff > 0 ? 'rgba(34, 197, 94, 0.1)' : 'rgba(239, 68, 68, 0.1)', border: `1px solid ${diff > 0 ? 'rgba(34, 197, 94, 0.2)' : 'rgba(239, 68, 68, 0.2)'}`, color: diff > 0 ? '#22c55e' : '#ef4444', fontWeight: '700', width: 'fit-content', fontSize: '10px', letterSpacing: '0.05em', boxShadow: `0 2px 10px ${diff > 0 ? 'rgba(34, 197, 94, 0.1)' : 'rgba(239, 68, 68, 0.1)'}` }}>
+                      <span style={{ fontSize: '12px', marginRight: '4px' }}>{diff > 0 ? '↑' : '↓'}</span>
+                      {Math.abs(diff)} {diff > 0 ? 'NEW' : ''}
                     </span>
                   )}
                 </div>

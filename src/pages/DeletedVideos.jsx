@@ -22,6 +22,18 @@ function DeletedVideos() {
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState(null);
 
+  const hexToRgba = (hex, alpha = 1) => {
+    // Supports formats like "#RRGGBB" and gracefully falls back to gray.
+    const normalized = (hex || '').toString().trim();
+    const m = normalized.match(/^#?([0-9a-fA-F]{6})$/);
+    if (!m) return `rgba(136, 136, 136, ${alpha})`;
+    const intVal = parseInt(m[1], 16);
+    const r = (intVal >> 16) & 255;
+    const g = (intVal >> 8) & 255;
+    const b = intVal & 255;
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  };
+
   useEffect(() => {
     async function load() {
       try {
@@ -116,9 +128,20 @@ function DeletedVideos() {
     }
   };
 
+  const proHeadingStyle = {
+    fontSize: '42px',
+    fontWeight: 900,
+    textTransform: 'uppercase',
+    letterSpacing: '0.15em',
+    color: '#fff',
+    margin: 0,
+    marginBottom: '8px',
+    fontFamily: '"Inter", system-ui, sans-serif',
+  };
+
   return (
     <div style={{ height: '100%', overflowY: 'auto', backgroundColor: COLORS.bgMain, padding: '22px', boxSizing: 'border-box', color: COLORS.textPrimary, fontFamily: 'system-ui' }}>
-      <h1 style={{ fontSize: '28px', fontWeight: 'bold', margin: 0, marginBottom: '8px' }}>Deleted Videos</h1>
+      <h1 style={proHeadingStyle}>Trash</h1>
       <div style={{ fontSize: '12px', color: '#666', marginBottom: '20px', fontStyle: 'italic' }}>
         Videos are automatically removed after 30 days
       </div>
@@ -135,24 +158,51 @@ function DeletedVideos() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxWidth: '900px' }}>
           {deletedVideos.map(v => {
             const daysLeft = getDaysLeft(v.deleted_at);
+            const topicColor = getTopicColor(v.topic_id);
+            const hoverGlow = `0 0 28px ${hexToRgba(topicColor, 0.38)}`;
             return (
               <div
                 key={v.id}
                 style={{
                   backgroundColor: COLORS.bgCard,
-                  border: `1px solid ${COLORS.borderDefault}`,
-                  borderLeft: `4px solid ${getTopicColor(v.topic_id)}`,
-                  borderRadius: '8px',
-                  padding: '12px',
+                  border: '1px solid rgba(255, 255, 255, 0.06)',
+                  borderRadius: '12px',
+                  padding: '14px 12px',
                   display: 'flex',
                   gap: '12px',
                   alignItems: 'center',
+                  boxShadow: 'none',
+                  transition: 'box-shadow 180ms ease',
                 }}
-                onMouseEnter={e => e.currentTarget.style.backgroundColor = '#2a2a2a'}
-                onMouseLeave={e => e.currentTarget.style.backgroundColor = COLORS.bgCard}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.boxShadow = `${hoverGlow}, 0 0 0 1px rgba(255,255,255,0.03)`;
+
+                  const dot = e.currentTarget.querySelector('.deleted-topic-dot');
+                  if (dot) {
+                    dot.style.boxShadow = `0 0 0 3px ${hexToRgba(topicColor, 0.12)}, 0 0 16px ${hexToRgba(topicColor, 0.35)}`;
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.boxShadow = 'none';
+
+                  const dot = e.currentTarget.querySelector('.deleted-topic-dot');
+                  if (dot) {
+                    dot.style.boxShadow = 'none';
+                  }
+                }}
               >
                 {/* Topic Dot */}
-                <div style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: getTopicColor(v.topic_id), flexShrink: 0 }} />
+                <div
+                  style={{
+                    width: '10px',
+                    height: '10px',
+                    borderRadius: '50%',
+                    backgroundColor: topicColor,
+                    flexShrink: 0,
+                    boxShadow: 'none',
+                  }}
+                  className="deleted-topic-dot"
+                />
                 
                 {/* Video Info */}
                 <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
