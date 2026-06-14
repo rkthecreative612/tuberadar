@@ -36,9 +36,33 @@ function extractHandleForChannelSearch(input) {
 }
 
 function isShortByTitle(item) {
-  const title = String(item?.snippet?.title ?? '')
+  const title = String(item?.snippet?.title ?? item?.title ?? '')
   const lower = title.toLowerCase()
   return lower.includes('#shorts') || lower.includes('#short')
+}
+
+/** ISO 8601 duration (PT15M32S) → seconds, or null if unknown. */
+export function parseIso8601DurationSeconds(duration) {
+  if (!duration || !String(duration).startsWith('PT')) return null
+  const regex = /PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/
+  const matches = String(duration).match(regex)
+  if (!matches) return null
+  const hours = parseInt(matches[1] || 0, 10)
+  const minutes = parseInt(matches[2] || 0, 10)
+  const seconds = parseInt(matches[3] || 0, 10)
+  return hours * 3600 + minutes * 60 + seconds
+}
+
+/** Detect YouTube Shorts for client-side filtering (≤60s or #shorts in title). */
+export function isYouTubeShort(video) {
+  if (isShortByTitle(video)) return true
+  const durationStr = video?.durationStr ?? ''
+  const secs = parseIso8601DurationSeconds(durationStr)
+  if (secs != null) return secs <= 60
+  if (durationStr.startsWith('PT') && !durationStr.includes('M') && !durationStr.includes('H')) {
+    return true
+  }
+  return false
 }
 
 async function fetchSearchWithStats(searchQuery, daysAgo = 2, channelId = null, maxResults = 12) {
@@ -65,8 +89,7 @@ async function fetchSearchWithStats(searchQuery, daysAgo = 2, channelId = null, 
 
   const { data } = await axios.get('https://www.googleapis.com/youtube/v3/search', { params })
 
-  const rawItems = data.items ?? []
-  const searchItems = rawItems.filter((item) => !isShortByTitle(item))
+  const searchItems = data.items ?? []
 
   const videoIds = searchItems.map((item) => item?.id?.videoId).filter(Boolean)
 
@@ -124,11 +147,7 @@ async function fetchSearchWithStats(searchQuery, daysAgo = 2, channelId = null, 
     }
   })
 
-  return mappedItems.filter((item) => {
-    const dur = item.durationStr || ''
-    const isShortDuration = dur.startsWith('PT') && !dur.includes('M') && !dur.includes('H')
-    return !isShortDuration
-  })
+  return mappedItems
 }
 
 function mapStatsOntoItems(items, getVideoId) {
@@ -252,8 +271,7 @@ async function fetchChannelUploadsWithStats(uploadsPlaylistId, daysAgo, maxResul
 
   const rawItems = (playlistData?.items ?? []).filter((item) => {
     const publishedAt = new Date(item?.snippet?.publishedAt ?? 0).getTime()
-    if (publishedAt < publishedAfterMs) return false
-    return !isShortByTitle({ snippet: item.snippet })
+    return publishedAt >= publishedAfterMs
   })
 
   if (rawItems.length === 0) return []
@@ -268,7 +286,7 @@ async function fetchChannelUploadsWithStats(uploadsPlaylistId, daysAgo, maxResul
 
   const mappedItems = mapStatsOntoItems(withStats, (item) => item?.snippet?.resourceId?.videoId)
 
-  return filterNonShortVideos(mappedItems)
+  return mappedItems
     .sort((a, b) => b.viewCount - a.viewCount)
     .slice(0, maxResults)
 }

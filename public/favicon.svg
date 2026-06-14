@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="TubeRadar">
+  <circle cx="16" cy="16" r="14" fill="#0a0a0a" stroke="#e50914" stroke-width="1.5"/>
+  <text x="8.5" y="21.5" fill="#fff" font-size="13" font-weight="800" font-family="system-ui,sans-serif">T</text>
+  <text x="15" y="21.5" fill="#e50914" font-size="13" font-weight="800" font-family="system-ui,sans-serif">R</text>
+  <polygon points="19.5,13.5 19.5,17 22.5,15.25" fill="#fff"/>
+</svg>

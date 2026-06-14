@@ -387,6 +387,20 @@ const Home = () => {
     try {
       const chId = editingChannel.id;
 
+      // 1. Get tracking IDs to delete breakdowns first
+      const { data: trackingRows } = await supabase
+        .from('revenue_tracking')
+        .select('id')
+        .eq('channel_id', chId);
+
+      if (trackingRows && trackingRows.length > 0) {
+        const trackingIds = trackingRows.map(r => r.id);
+        await supabase.from('revenue_breakdown').delete().in('revenue_id', trackingIds);
+      }
+
+      // 2. Delete revenue tracking rows
+      await supabase.from('revenue_tracking').delete().eq('channel_id', chId);
+
       // Sequential deletion of related data
       await supabase.from('brainstorm_items').delete().eq('topic_id', chId);
       await supabase.from('planner_videos').delete().eq('topic_id', chId);

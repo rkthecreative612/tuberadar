@@ -1,9 +1,18 @@
-import React, { useState, useEffect } from 'react'
-import { searchByChannel, searchByKeywords, YouTubeQuotaError } from '../lib/youtube'
+import React, { useState, useEffect, useMemo } from 'react'
+import { searchByChannel, searchByKeywords, YouTubeQuotaError, isYouTubeShort } from '../lib/youtube'
 import supabase from '../lib/supabase'
 
 function MainDashboard({ selectedMyChannel, onBackClick }) {
   const [videos, setVideos] = useState([])
+  const [unfilteredPhase1, setUnfilteredPhase1] = useState([])
+  const [unfilteredPhase2, setUnfilteredPhase2] = useState([])
+  const [removedVideoIds, setRemovedVideoIds] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('removed_videos') || '[]')
+    } catch (e) {
+      return []
+    }
+  })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [stats, setStats] = useState({
@@ -14,11 +23,14 @@ function MainDashboard({ selectedMyChannel, onBackClick }) {
   const [isEditing, setIsEditing] = useState(false)
   const [editName, setEditName] = useState('')
   const [movedVideoIds, setMovedVideoIds] = useState(new Set())
+  const [showShorts, setShowShorts] = useState(true)
+  const [noUploadsIn30Days, setNoUploadsIn30Days] = useState(false)
 
   useEffect(() => {
     if (selectedMyChannel) {
       setEditName(selectedMyChannel.name || '')
       setIsEditing(false)
+      setShowShorts(true)
     }
   }, [selectedMyChannel])
 
@@ -44,6 +56,7 @@ function MainDashboard({ selectedMyChannel, onBackClick }) {
     async function fetchVideos() {
       setLoading(true)
       setError(null)
+      setNoUploadsIn30Days(false)
       try {
         const { data: competitors, error: compError } = await supabase
           .from('competitor_channels')
@@ -53,7 +66,10 @@ function MainDashboard({ selectedMyChannel, onBackClick }) {
         if (compError) throw new Error('Failed to load competitors')
 
         if (!competitors || competitors.length === 0) {
-          if (isMounted) setVideos([])
+          if (isMounted) {
+            setVideos([])
+            setNoUploadsIn30Days(false)
+          }
           return
         }
 
@@ -63,19 +79,23 @@ function MainDashboard({ selectedMyChannel, onBackClick }) {
         } catch(e) {}
 
         const mapItem = (item, comp, phase) => {
-          const viewCount = item.viewCount ?? 0;
+          const viewCount = item.viewCount ?? 0
+          const title = item.snippet.title
+          const durationStr = item.durationStr ?? ''
           return {
             compName: comp.name,
-            title: item.snippet.title,
+            title,
             channelName: item.snippet.channelTitle,
             videoId: item.id.videoId,
             thumbnail: `https://img.youtube.com/vi/${item.id.videoId}/mqdefault.jpg`,
             publishedAt: item.snippet.publishedAt,
-            viewCount: viewCount,
+            viewCount,
             likeCount: item.likeCount ?? 0,
             commentCount: item.commentCount ?? (item.statistics?.commentCount || 0),
             description: item.description || item.snippet?.description || '',
-            phase
+            durationStr,
+            isShort: isYouTubeShort({ title, durationStr }),
+            phase,
           }
         }
 
@@ -114,6 +134,9 @@ function MainDashboard({ selectedMyChannel, onBackClick }) {
           phase2Candidates.push(...older)
         }
 
+        const rawPhase1 = [...phase1Videos]
+        const rawPhase2 = [...phase2Candidates]
+
         phase1Videos = phase1Videos.filter(v => !removedIds.includes(v.videoId))
         phase1Videos.sort((a, b) => b.viewCount - a.viewCount)
 
@@ -139,11 +162,20 @@ function MainDashboard({ selectedMyChannel, onBackClick }) {
           return true;
         });
 
-        allVideos = allVideos.slice(0, 20);
+        allVideos = allVideos.slice(0, 20)
+
+        const totalFromApi = competitorResults.reduce(
+          (sum, { items }) => sum + (items?.length ?? 0),
+          0,
+        )
 
         if (!isMounted) return
 
+        setRemovedVideoIds(removedIds)
+        setUnfilteredPhase1(rawPhase1)
+        setUnfilteredPhase2(rawPhase2)
         setVideos(allVideos)
+        setNoUploadsIn30Days(totalFromApi === 0)
 
         // Best-effort cache/persist competitor video metadata (non-blocking for UI).
         try {
@@ -183,6 +215,7 @@ function MainDashboard({ selectedMyChannel, onBackClick }) {
         if (isMounted) {
           setError(e?.message ?? 'Failed to load videos')
           setVideos([])
+          setNoUploadsIn30Days(false)
         }
       } finally {
         if (isMounted) setLoading(false)
@@ -201,8 +234,36 @@ function MainDashboard({ selectedMyChannel, onBackClick }) {
     const confirmDelete = window.confirm(`Delete ${selectedMyChannel.name}?`)
     if (!confirmDelete) return
 
-    await supabase.from('my_channels').delete().eq('id', selectedMyChannel.id)
-    if (onBackClick) onBackClick()
+    const chId = selectedMyChannel.id;
+
+    try {
+      // 1. Get tracking IDs to delete breakdowns first
+      const { data: trackingRows } = await supabase
+        .from('revenue_tracking')
+        .select('id')
+        .eq('channel_id', chId);
+
+      if (trackingRows && trackingRows.length > 0) {
+        const trackingIds = trackingRows.map(r => r.id);
+        await supabase.from('revenue_breakdown').delete().in('revenue_id', trackingIds);
+      }
+
+      // 2. Delete revenue tracking rows
+      await supabase.from('revenue_tracking').delete().eq('channel_id', chId);
+
+      // 3. Delete other related data
+      await supabase.from('brainstorm_items').delete().eq('topic_id', chId);
+      await supabase.from('planner_videos').delete().eq('topic_id', chId);
+      await supabase.from('competitor_channels').delete().eq('my_channel_id', chId);
+
+      const { error } = await supabase.from('my_channels').delete().eq('id', chId);
+      if (error) throw error;
+
+      if (onBackClick) onBackClick();
+    } catch (err) {
+      console.error(err);
+      alert('Failed to delete channel');
+    }
   }
 
   const handleMoveToBrainstorm = async (video) => {
@@ -274,15 +335,47 @@ function MainDashboard({ selectedMyChannel, onBackClick }) {
     }
   }
 
+  const updateVisibleVideos = (phase1, phase2Candidates, currentRemovedIds) => {
+    let phase1Filtered = phase1.filter(v => !currentRemovedIds.includes(v.videoId))
+    phase1Filtered.sort((a, b) => b.viewCount - a.viewCount)
+
+    let phase2Filtered = []
+    if (phase1Filtered.length < 20) {
+      const needed = 20 - phase1Filtered.length
+      phase2Filtered = phase2Candidates
+        .filter(v =>
+          !currentRemovedIds.includes(v.videoId) &&
+          !phase1Filtered.some(p1 => p1.videoId === v.videoId)
+        )
+        .sort((a, b) => b.viewCount - a.viewCount)
+        .slice(0, needed)
+    }
+
+    let allVideos = [...phase1Filtered, ...phase2Filtered]
+    const seenIds = new Set()
+    allVideos = allVideos.filter(v => {
+      if (seenIds.has(v.videoId)) return false
+      seenIds.add(v.videoId)
+      return true
+    })
+
+    setVideos(allVideos.slice(0, 20))
+  }
+
   const handleRemove = (videoId) => {
-    let removedIds = []
-    try {
-      removedIds = JSON.parse(localStorage.getItem('removed_videos') || '[]')
-    } catch(e) {}
-    removedIds.push(videoId)
-    localStorage.setItem('removed_videos', JSON.stringify(removedIds))
-    
-    setVideos(prev => prev.filter(v => v.videoId !== videoId))
+    setRemovedVideoIds(prev => {
+      if (prev.includes(videoId)) return prev
+      const updated = [...prev, videoId]
+      localStorage.setItem('removed_videos', JSON.stringify(updated))
+      updateVisibleVideos(unfilteredPhase1, unfilteredPhase2, updated)
+      return updated
+    })
+  }
+
+  const handleUndoRemove = () => {
+    localStorage.setItem('removed_videos', JSON.stringify([]))
+    setRemovedVideoIds([])
+    updateVisibleVideos(unfilteredPhase1, unfilteredPhase2, [])
   }
 
   const timeAgo = (dateString) => {
@@ -403,37 +496,6 @@ function MainDashboard({ selectedMyChannel, onBackClick }) {
     gap: '30px',
   }
 
-  const statCardsContainerStyle = {
-    display: 'flex',
-    gap: '20px'
-  }
-
-  const statCardStyle = {
-    flex: 1,
-    backgroundColor: '#1a1a1a',
-    border: '1px solid #333',
-    borderRadius: '12px',
-    padding: '20px',
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '8px'
-  }
-
-  const statValStyle = {
-    fontSize: '24px',
-    fontWeight: 'bold',
-    color: '#fff',
-    margin: 0
-  }
-
-  const statLabelStyle = {
-    fontSize: '14px',
-    color: '#888',
-    margin: 0,
-    textTransform: 'uppercase',
-    letterSpacing: '0.5px',
-    fontWeight: 600
-  }
 
   const sectionLabelContainerStyle = {
     gridColumn: '1 / -1',
@@ -567,6 +629,64 @@ function MainDashboard({ selectedMyChannel, onBackClick }) {
     }).format(num);
   };
 
+  const visibleVideos = useMemo(
+    () => (showShorts ? videos : videos.filter((v) => !v.isShort)),
+    [videos, showShorts],
+  )
+
+  const sectionHeaderRowStyle = {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: '16px',
+    marginBottom: '16px',
+    flexWrap: 'wrap',
+  }
+
+  const shortsToggleLabelStyle = {
+    fontSize: '13px',
+    fontWeight: 600,
+    color: '#ccc',
+    marginRight: '10px',
+  }
+
+  const shortsToggleTrackStyle = (on) => ({
+    width: '44px',
+    height: '24px',
+    borderRadius: '12px',
+    backgroundColor: on ? '#4caf50' : '#444',
+    border: '1px solid',
+    borderColor: on ? '#4caf50' : '#555',
+    position: 'relative',
+    cursor: 'pointer',
+    transition: 'background-color 0.2s, border-color 0.2s',
+    flexShrink: 0,
+  })
+
+  const shortsToggleThumbStyle = (on) => ({
+    position: 'absolute',
+    top: '2px',
+    left: on ? '22px' : '2px',
+    width: '18px',
+    height: '18px',
+    borderRadius: '50%',
+    backgroundColor: '#fff',
+    transition: 'left 0.2s',
+    boxShadow: '0 1px 3px rgba(0,0,0,0.4)',
+  })
+
+  const emptyMessageStyle = {
+    color: '#888',
+    fontSize: '15px',
+    lineHeight: 1.5,
+    margin: 0,
+    padding: '24px',
+    backgroundColor: '#1a1a1a',
+    border: '1px solid #333',
+    borderRadius: '12px',
+    gridColumn: '1 / -1',
+  }
+
   return (
     <main style={rootStyle}>
       {isEditing ? (
@@ -621,23 +741,79 @@ function MainDashboard({ selectedMyChannel, onBackClick }) {
 
       <div style={scrollAreaStyle}>
         
-        <div style={statCardsContainerStyle}>
-          <div style={statCardStyle}>
-            <p style={statValStyle}>{stats.recentCount}</p>
-            <p style={statLabelStyle}>Recent Uploads</p>
+        <div className="stat-cards-row">
+          <div className="stat-card-premium stat-card-premium--recent">
+            <p className="stat-card-premium__value">{stats.recentCount}</p>
+            <p className="stat-card-premium__label">Recent Uploads</p>
           </div>
-          <div style={statCardStyle}>
-            <p style={statValStyle}>{stats.topCount}</p>
-            <p style={statLabelStyle}>Top Performing (&gt;100k views)</p>
+          <div className="stat-card-premium stat-card-premium--top">
+            <p className="stat-card-premium__value">{stats.topCount}</p>
+            <p className="stat-card-premium__label">Top Performing (&gt;100k views)</p>
           </div>
-          <div style={statCardStyle}>
-            <p style={{ ...statValStyle, fontSize: '20px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{stats.bestChannel}</p>
-            <p style={statLabelStyle}>Best Category Channel</p>
+          <div className="stat-card-premium stat-card-premium--best">
+            <p className="stat-card-premium__value stat-card-premium__value--compact">{stats.bestChannel}</p>
+            <p className="stat-card-premium__label">Best Category Channel</p>
           </div>
         </div>
 
         <div>
-          <h2 style={sectionHeaderStyle}>Competitor Videos</h2>
+          <div style={sectionHeaderRowStyle}>
+            <h2 style={{ ...sectionHeaderStyle, marginBottom: 0 }}>Competitor Videos</h2>
+            {!loading && (videos.length > 0 || removedVideoIds.length > 0) && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                {removedVideoIds.length > 0 && (
+                  <div style={{ display: 'flex', alignItems: 'center' }}>
+                    <span style={shortsToggleLabelStyle}>Undo Remove</span>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-label="Undo Remove"
+                      title="Undo video removals"
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        padding: 0,
+                        border: 'none',
+                        background: 'transparent',
+                        cursor: 'pointer',
+                      }}
+                      onClick={handleUndoRemove}
+                    >
+                      <span style={shortsToggleTrackStyle(true)}>
+                        <span style={shortsToggleThumbStyle(true)} />
+                      </span>
+                    </button>
+                  </div>
+                )}
+                
+                {videos.length > 0 && (
+                  <div style={{ display: 'flex', alignItems: 'center' }}>
+                    <span style={shortsToggleLabelStyle}>Shorts</span>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={showShorts}
+                      aria-label={showShorts ? 'Shorts on' : 'Shorts off — long-form only'}
+                      title={showShorts ? 'Showing Shorts and long-form' : 'Hiding Shorts — long-form only'}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        padding: 0,
+                        border: 'none',
+                        background: 'transparent',
+                        cursor: 'pointer',
+                      }}
+                      onClick={() => setShowShorts((on) => !on)}
+                    >
+                      <span style={shortsToggleTrackStyle(showShorts)}>
+                        <span style={shortsToggleThumbStyle(showShorts)} />
+                      </span>
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
 
           {error && <p style={{ color: '#ff5252' }}>{error}</p>}
 
@@ -655,12 +831,12 @@ function MainDashboard({ selectedMyChannel, onBackClick }) {
                   <button style={{ ...brainstormButtonStyle, backgroundColor: '#2a2a2a', color: '#888', borderColor: 'transparent', cursor: 'default' }}>Loading...</button>
                 </div>
               ))
-            ) : videos.length === 0 ? (
-              <p style={{ color: '#888' }}>No videos found.</p>
+            ) : noUploadsIn30Days || videos.length === 0 || visibleVideos.length === 0 ? (
+              <p style={emptyMessageStyle}>No new videos in the last 30 days.</p>
             ) : (
-              videos.map((v, idx) => {
+              visibleVideos.map((v, idx) => {
                 const isFirstPhase1 = v.phase === 1 && idx === 0;
-                const isFirstPhase2 = v.phase === 2 && (idx === 0 || videos[idx - 1].phase === 1);
+                const isFirstPhase2 = v.phase === 2 && (idx === 0 || visibleVideos[idx - 1].phase === 1);
                 const score = calcScore(v);
                 const scoreColor = getScoreColor(score);
                 return (

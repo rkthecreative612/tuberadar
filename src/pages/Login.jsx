@@ -194,6 +194,46 @@ function IconEye({ open }) {
   )
 }
 
+function IconAnalytics() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={RED} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 19V11" />
+      <path d="M10 19V5" />
+      <path d="M16 19V9" />
+      <path d="M22 19H2" />
+      <path d="M18 7l2-2 2 2" />
+      <path d="M20 5v4" />
+    </svg>
+  )
+}
+
+function IconContentPlanning() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={RED} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="4" width="18" height="18" rx="2" />
+      <path d="M16 2v4" />
+      <path d="M8 2v4" />
+      <path d="M3 10h18" />
+      <path d="M9 15l2 2 4-4" />
+    </svg>
+  )
+}
+
+function IconChannelManagement() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={RED} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="4" width="9" height="7" rx="1.5" />
+      <rect x="13" y="4" width="9" height="7" rx="1.5" />
+      <rect x="2" y="13" width="9" height="7" rx="1.5" />
+      <rect x="13" y="13" width="9" height="7" rx="1.5" />
+      <polygon points="5.5,7 5.5,8.5 7.5,7.5" fill={RED} stroke="none" />
+      <polygon points="16.5,7 16.5,8.5 18.5,7.5" fill={RED} stroke="none" />
+      <polygon points="5.5,16 5.5,17.5 7.5,16.5" fill={RED} stroke="none" />
+      <polygon points="16.5,16 16.5,17.5 18.5,16.5" fill={RED} stroke="none" />
+    </svg>
+  )
+}
+
 function FeatureItem({ icon, title, desc }) {
   return (
     <div style={{ textAlign: 'center', flex: 1, minWidth: 0, padding: '0 8px' }}>
@@ -307,39 +347,24 @@ export default function Login() {
             }}
           >
             <FeatureItem
-              icon={
-                <svg width="20" height="20" viewBox="0 0 24 24" fill={RED}>
-                  <polygon points="8,5 19,12 8,19" />
-                </svg>
-              }
-              title="Fast Streaming"
-              desc="Ultra fast and smooth experience"
+              icon={<IconAnalytics />}
+              title="Smart Analytics"
+              desc="Track competitor videos & performance metrics in real-time"
             />
             <FeatureItem
-              icon={
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={RED} strokeWidth="2">
-                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-                </svg>
-              }
-              title="Secure & Safe"
-              desc="Your data is always protected"
+              icon={<IconContentPlanning />}
+              title="Content Planning"
+              desc="Organize, schedule, and manage your video content effortlessly"
             />
             <FeatureItem
-              icon={
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={RED} strokeWidth="2">
-                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                  <circle cx="9" cy="7" r="4" />
-                  <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-                  <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-                </svg>
-              }
-              title="User Friendly"
-              desc="Simple, clean and easy to use"
+              icon={<IconChannelManagement />}
+              title="Channel Management"
+              desc="Monitor multiple YouTube channels from one dashboard"
             />
           </div>
 
           <p style={{ margin: '28px 0 0', color: '#888', fontSize: '14px', textAlign: 'center' }}>
-            Stream. Watch. <span style={{ color: RED, fontWeight: 600 }}>Enjoy.</span>
+            Plan. Track. <span style={{ color: RED, fontWeight: 600 }}>Grow.</span>
           </p>
         </div>
 

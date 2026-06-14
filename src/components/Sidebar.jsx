@@ -112,7 +112,7 @@ function Sidebar() {
 
       <nav style={navStyle} aria-label="Navigation">
         <Item to="/landing" label="Home" />
-        <Item to="/planner" label="Board" />
+        <Item to="/planner" label="Planner" />
         <Item to="/scheduler" label="Tasks" />
         <Item to="/status" label="Status" />
         <Item to="/home" label="Channels" end />

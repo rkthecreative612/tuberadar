@@ -804,7 +804,7 @@ function Planner() {
         onContextMenu={handleContextMenu}
         onWheel={handleWheel}
       >
-        <div style={{ padding: '0 22px 30px 22px', fontSize: '42px', fontWeight: 900, textTransform: 'uppercase', textAlign: 'center', letterSpacing: '0.15em', background: 'linear-gradient(to bottom, #ffffff 30%, #555555 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', filter: 'drop-shadow(0px 8px 16px rgba(255,255,255,0.1))', fontFamily: '"Inter", system-ui, sans-serif' }}>Board</div>
+        <div style={{ padding: '0 22px 30px 22px', fontSize: '42px', fontWeight: 900, textTransform: 'uppercase', textAlign: 'center', letterSpacing: '0.15em', background: 'linear-gradient(to bottom, #ffffff 30%, #555555 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', filter: 'drop-shadow(0px 8px 16px rgba(255,255,255,0.1))', fontFamily: '"Inter", system-ui, sans-serif' }}>Planner</div>
         <div 
           ref={scrollContainerRef}
           className="plannerGrid hide-scrollbar" 
